@@ -1,6 +1,6 @@
 
 # Hide the warning messages about CPU/GPU
-import TensorflowUtils as utils
+import utils as utils
 import glob
 from tensorflow.python.platform import gfile
 from six.moves import cPickle as pickle
@@ -19,32 +19,33 @@ DATA_URL = 'http://data.csail.mit.edu/places/ADEchallenge/ADEChallengeData2016.z
 """
 
 
-def read_dataset(data_dir):
+def read_dataset(data_dir, data_set):
 
     # sample record: {'image': f, 'annotation': annotation_file,
     # 'filename': filename}
     training_records = []
-
-    testdir = "D:/Datasets/Dressup10k/images/training/"
-
-    print("## Training dir:", testdir)
-    for filename in glob.glob(testdir + '*.jpg'):  # assuming jpg files
-        record = {'image': filename, 'annotation': filename.replace(
-            "images", "annotations").replace(
-            "jpg", "png"), 'filename': filename}
-        training_records.append(record)
-
     validation_records = []
 
-    validationdir = "D:/Datasets/Dressup10k/images/validation/"
+    if data_set == "10k":
 
-    print("## Validation dir:", validationdir)
-    for filename in glob.glob(
-            validationdir + '*.jpg'):  # assuming jpg files
-        record = {'image': filename, 'annotation': filename.replace(
-            "images", "annotations").replace(
-            "jpg", "png"), 'filename': filename}
-        validation_records.append(record)
+        testdir = data_dir + "images/training/"
+
+        print("## Training dir:", testdir)
+        for filename in glob.glob(testdir + '*.jpg'):  # assuming jpg files
+            record = {'image': filename, 'annotation': filename.replace(
+                "images", "annotations").replace(
+                "jpg", "png"), 'filename': filename}
+            training_records.append(record)
+
+        validationdir = data_dir + "images/validation/"
+
+        print("## Validation dir:", validationdir)
+        for filename in glob.glob(
+                validationdir + '*.jpg'):  # assuming jpg files
+            record = {'image': filename, 'annotation': filename.replace(
+                "images", "annotations").replace(
+                "jpg", "png"), 'filename': filename}
+            validation_records.append(record)
 
     return training_records, validation_records
 

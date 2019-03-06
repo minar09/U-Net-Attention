@@ -1,15 +1,12 @@
 from __future__ import print_function
 
 import matplotlib.pyplot as plt
-from six.moves import xrange
-import datetime
-
 import numpy as np
 import tensorflow as tf
 import time
 import EvalMetrics
-import inference
-import TensorflowUtils as Utils
+import utils
+import ApplyCRF
 
 # Hide the warning messages about CPU/GPU
 import os
@@ -57,16 +54,16 @@ def vgg_net(weights, image):
             # matconvnet: weights are [width, height, in_channels, out_channels]
             # tensorflow: weights are [height, width, in_channels,
             # out_channels]
-            kernels = Utils.get_variable(np.transpose(
+            kernels = utils.get_variable(np.transpose(
                 kernels, (1, 0, 2, 3)), name=name + "_w")
-            bias = Utils.get_variable(bias.reshape(-1), name=name + "_b")
-            current = Utils.conv2d_basic(current, kernels, bias)
+            bias = utils.get_variable(bias.reshape(-1), name=name + "_b")
+            current = utils.conv2d_basic(current, kernels, bias)
         elif kind == 'relu':
             current = tf.nn.relu(current, name=name)
             # if FLAGS.debug:
             # util.add_activation_summary(current)
         elif kind == 'pool':
-            current = Utils.avg_pool_2x2(current)
+            current = utils.avg_pool_2x2(current)
         net[name] = current
         # added for resume better
     global_iter_counter = tf.Variable(0, name='global_step', trainable=False)
@@ -104,11 +101,11 @@ def mode_visualize(sess, FLAGS, TEST_DIR, validation_dataset_reader, pred_annota
     crf_crossMats = list()
 
     for itr in range(FLAGS.batch_size):
-        Utils.save_image(valid_images[itr].astype(
+        utils.save_image(valid_images[itr].astype(
             np.uint8), TEST_DIR, name="inp_" + str(itr))
-        Utils.save_image(valid_annotations[itr].astype(
+        utils.save_image(valid_annotations[itr].astype(
             np.uint8) * 255 / NUM_OF_CLASSES, TEST_DIR, name="gt_" + str(itr))
-        Utils.save_image(pred[itr].astype(
+        utils.save_image(pred[itr].astype(
             np.uint8) * 255 / NUM_OF_CLASSES, TEST_DIR, name="pred_" + str(itr))
         print("Saved image: %d" % itr)
 
@@ -120,7 +117,7 @@ def mode_visualize(sess, FLAGS, TEST_DIR, validation_dataset_reader, pred_annota
         crossMats.append(cm)
 
         """ Generate CRF """
-        crfimage, crfoutput = inference.crf(TEST_DIR + "inp_" + str(itr) + ".png", TEST_DIR + "pred_" + str(
+        crfimage, crfoutput = ApplyCRF.crf(TEST_DIR + "inp_" + str(itr) + ".png", TEST_DIR + "pred_" + str(
             itr) + ".png", TEST_DIR + "crf_" + str(itr) + ".png", NUM_OF_CLASSES, use_2d=True)
 
         # Eval metrics for this image prediction with crf
@@ -138,124 +135,6 @@ def mode_visualize(sess, FLAGS, TEST_DIR, validation_dataset_reader, pred_annota
     print(">>> Prediction results (CRF):")
     crf_total_cm = np.sum(crf_crossMats, axis=0)
     EvalMetrics.show_result(crf_total_cm, NUM_OF_CLASSES)
-
-
-def mode_train(sess, FLAGS, net, train_dataset_reader, validation_dataset_reader, train_records, pred_annotation, image, annotation, keep_probability, logits, train_op, loss, summary_op, summary_writer, saver, display_step=300):
-    print(">>>>>>>>>>>>>>>>Train mode")
-    start = time.time()
-
-    # Start decoder training
-
-    valid = list()
-    step = list()
-    lo = list()
-
-    global_step = sess.run(net['global_step'])
-    global_step = 0
-    max_iteration = round(
-        (train_dataset_reader.get_num_of_records() //
-         FLAGS.batch_size) *
-        FLAGS.training_epochs)
-    display_step = round(
-        train_dataset_reader.get_num_of_records() // FLAGS.batch_size)
-    print(
-        "No. of maximum steps:",
-        max_iteration,
-        " Training epochs:",
-        FLAGS.training_epochs)
-
-    for itr in xrange(global_step, max_iteration):
-        # 6.1 load train and GT images
-        train_images, train_annotations = train_dataset_reader.next_batch(
-            FLAGS.batch_size)
-
-        feed_dict = {
-            image: train_images,
-            annotation: train_annotations,
-            keep_probability: 0.85}
-
-        # 6.2 training
-        sess.run(train_op, feed_dict=feed_dict)
-
-        if itr % 10 == 0:
-            train_loss, summary_str = sess.run(
-                [loss, summary_op], feed_dict=feed_dict)
-            print("Step: %d, Train_loss:%g" % (itr, train_loss))
-            summary_writer.add_summary(summary_str, itr)
-            if itr % display_step == 0 and itr != 0:
-                lo.append(train_loss)
-
-        if itr % display_step == 0 and itr != 0:
-            valid_images, valid_annotations = validation_dataset_reader.next_batch(
-                FLAGS.batch_size)
-            valid_loss = sess.run(
-                loss,
-                feed_dict={
-                    image: valid_images,
-                    annotation: valid_annotations,
-                    keep_probability: 1.0})
-            print(
-                "%s ---> Validation_loss: %g" %
-                (datetime.datetime.now(), valid_loss))
-            global_step = sess.run(net['global_step'])
-            saver.save(
-                sess,
-                FLAGS.logs_dir +
-                "model.ckpt",
-                global_step=global_step)
-
-            valid.append(valid_loss)
-            step.append(itr)
-            # print("valid", valid, "step", step)
-
-            try:
-                plt.clf()
-                plt.ylim(0, 1)
-                plt.plot(np.array(step), np.array(lo))
-                plt.title('Training Loss')
-                plt.ylabel("Loss")
-                plt.xlabel("Step")
-                plt.savefig(FLAGS.logs_dir + "training_loss.jpg")
-            except Exception as err:
-                print(err)
-
-            try:
-                plt.clf()
-                plt.ylim(0, 1)
-                plt.plot(np.array(step), np.array(valid))
-                plt.ylabel("Loss")
-                plt.xlabel("Step")
-                plt.title('Validation Loss')
-                plt.savefig(FLAGS.logs_dir + "validation_loss.jpg")
-            except Exception as err:
-                print(err)
-
-            try:
-                plt.clf()
-                plt.ylim(0, 1)
-                plt.plot(np.array(step), np.array(lo))
-                plt.plot(np.array(step), np.array(valid))
-                plt.ylabel("Loss")
-                plt.xlabel("Step")
-                plt.title('Result')
-                plt.legend(['Training Loss', 'Validation Loss'],
-                           loc='upper right')
-                plt.savefig(FLAGS.logs_dir + "merged_loss.jpg")
-            except Exception as err:
-                print(err)
-
-    try:
-        np.savetxt(
-            FLAGS.logs_dir +
-            "training_steps.csv",
-            np.c_[step, lo, valid],
-            fmt='%4f',
-            delimiter=',')
-    except Exception as err:
-        print(err)
-
-    end = time.time()
-    print("Learning time:", end - start, "seconds")
 
 
 def mode_test(sess, FLAGS, TEST_DIR, validation_dataset_reader, valid_records, pred_annotation, image, annotation, keep_probability, logits, NUM_OF_CLASSES):
@@ -327,17 +206,17 @@ def mode_test(sess, FLAGS, TEST_DIR, validation_dataset_reader, valid_records, p
             # Save input, gt, pred, crf_pred, sum figures for this image
 
             # ---------------------------------------------
-            Utils.save_image(valid_images[itr2].astype(np.uint8), TEST_DIR,
+            utils.save_image(valid_images[itr2].astype(np.uint8), TEST_DIR,
                              name="inp_" + str(itr1 * FLAGS.batch_size + itr2))
-            Utils.save_image(valid_annotations[itr2].astype(np.uint8), TEST_DIR,
+            utils.save_image(valid_annotations[itr2].astype(np.uint8), TEST_DIR,
                              name="gt_" + str(itr1 * FLAGS.batch_size + itr2))
-            Utils.save_image(pred[itr2].astype(np.uint8),
+            utils.save_image(pred[itr2].astype(np.uint8),
                              TEST_DIR,
                              name="pred_" + str(itr1 * FLAGS.batch_size + itr2))
 
             # --------------------------------------------------
             """ Generate CRF """
-            crfimage, crfoutput = inference.crf(TEST_DIR + "inp_" + str(itr1 * FLAGS.batch_size + itr2) + ".png", TEST_DIR + "pred_" + str(
+            crfimage, crfoutput = ApplyCRF.crf(TEST_DIR + "inp_" + str(itr1 * FLAGS.batch_size + itr2) + ".png", TEST_DIR + "pred_" + str(
                 itr1 * FLAGS.batch_size + itr2) + ".png", TEST_DIR + "crf_" + str(itr1 * FLAGS.batch_size + itr2) + ".png", NUM_OF_CLASSES, use_2d=True)
 
             # Confusion matrix for this image prediction with crf
