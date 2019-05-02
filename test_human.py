@@ -12,28 +12,25 @@ def main():
 
 
 def init_path():
+    data_dir = "logs/UNetMSc_10k/TestImage/"
 
-    val_output_dir = 'logs/UNet_CFPD/pred/'
-    val_label_dir = 'logs/UNet_CFPD/gt/'
-
-    val_pred_file_names = os.listdir(val_output_dir)
-    val_label_file_names = os.listdir(val_label_dir)
+    file_names = os.listdir(data_dir)
 
     val_gt_paths = []
     val_pred_paths = []
 
-    for file_name in tqdm(val_pred_file_names):
-        val_pred_paths.append(os.path.join(val_output_dir, file_name))
-
-    for file_name in tqdm(val_label_file_names):
-        val_gt_paths.append(os.path.join(val_label_dir, file_name))
+    for file_name in tqdm(file_names):
+        if file_name.startswith("pred_") and "_vis" not in file_name:
+            val_pred_paths.append(os.path.join(data_dir, file_name))
+        elif file_name.startswith("gt_") and "_vis" not in file_name:
+            val_gt_paths.append(os.path.join(data_dir, file_name))
 
     return val_pred_paths, val_gt_paths
 
 
 def fast_hist(a, b, n):
     k = (a >= 0) & (a < n)
-    return np.bincount(n * a[k].astype(int) + b[k], minlength=n**2).reshape(n, n)
+    return np.bincount(n * a[k].astype(int) + b[k], minlength=n ** 2).reshape(n, n)
 
 
 def compute_hist(images, labels):
@@ -55,24 +52,26 @@ def compute_hist(images, labels):
             image_array = np.array(image, dtype=np.int32)
 
         hist += fast_hist(label_array, image_array, n_cl)
-        cm = EM._calcCrossMat(label_array, image_array, n_cl)
+        cm = EM.calculate_confusion_matrix(label_array, image_array, n_cl)
         crossMats.append(cm)
 
     T_CM = np.sum(crossMats, axis=0)
-    np.savetxt("logs/UNet_CFPD/our_totalCM.csv",
-               T_CM, fmt='%4i', delimiter=',')
-    print(EM._calc_eval_metrics_from_confusion_matrix(T_CM, n_cl))
+    # np.savetxt("logs/UNet_10k/labelcrf_totalCM.csv", T_CM, fmt='%4i', delimiter=',')
+    print(EM.calculate_eval_metrics_from_confusion_matrix(T_CM, n_cl))
 
     return hist
 
 
 def show_result(hist):
-    np.savetxt("logs/UNet_CFPD/JPP_totalCM.csv",
-               hist, fmt='%4i', delimiter=',')
+    # np.savetxt("logs/UNet_10k/totalCM.csv", hist, fmt='%4i', delimiter=',')
 
-    classes = ['bk', 'T-shirt', 'bag', 'belt', 'blazer', 'blouse', 'coat', 'dress', 'face', 'hair',
-               'hat', 'jeans', 'legging', 'pants', 'scarf', 'shoe', 'shorts', 'skin', 'skirt',
-               'socks', 'stocking', 'sunglass', 'sweater']
+    classes = ['background', 'hat', 'hair', 'sunglasses', 'upperclothes', 'skirt', 'pants', 'dress',
+               'belt', 'leftShoe', 'rightShoe', 'face', 'leftLeg', 'rightLeg', 'leftArm', 'rightArm', 'bag', 'scarf']
+
+    # classes = ['bk', 'T-shirt', 'bag', 'belt', 'blazer', 'blouse', 'coat', 'dress', 'face', 'hair',
+    # 'hat', 'jeans', 'legging', 'pants', 'scarf', 'shoe', 'shorts', 'skin', 'skirt',
+    # 'socks', 'stocking', 'sunglass', 'sweater']
+
     # num of correct pixels
     num_cor_pix = np.diag(hist)
     # num of gt pixels

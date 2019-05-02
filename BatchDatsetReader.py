@@ -28,7 +28,7 @@ class BatchDatset:
         print("Initializing Batch Dataset Reader, It may take minutes...")
         print(image_options)
         self.files = records_list
-        #print("files:", self.files)
+        # print("files:", self.files)
         self.image_options = image_options
         self._read_images()
 

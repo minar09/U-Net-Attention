@@ -8,23 +8,61 @@ import numpy as np
 import tensorflow as tf
 import time
 import EvalMetrics
-import inference
+import denseCRF
 import TensorflowUtils as Utils
+from matplotlib.colors import ListedColormap, BoundaryNorm
 
 # Hide the warning messages about CPU/GPU
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 
-# color map for LIP
-LIP_colors = [(0, 0, 0)                 # 0=Background
-              # 1=Hat,  2=Hair,    3=Glove, 4=Sunglasses, 5=UpperClothes
-              # 6=Dress, 7=Coat, 8=Socks, 9=Pants, 10=Jumpsuits
-              # 11=Scarf, 12=Skirt, 13=Face, 14=LeftArm, 15=RightArm
-              , (128, 0, 0), (255, 0, 0), (0, 85, 0), (170, 0, 51), (255, 85, 0), (0, 0, 85), (0, 119, 221), (85, 85, 0), (0, 85, 85), (85, 51, 0), (52, 86, 128), (0, 128, 0), (0, 0, 255), (51, 170, 221), (0, 255, 255), (85, 255, 170), (170, 255, 85), (255, 255, 0), (255, 170, 0)]
-cmap_name = 'lip_cmap'
-n_bins = [3, 6, 10, 100]  # Discretizes the interpolation into bins
-# lip_cm = LinearSegmentedColormap.from_list(cmap_name, LIP_colors, N=n_bin)
+label_colors_10k = ['black',  # "background", #     0
+                'sienna',  # "hat", #            1
+                'gray',  # "hair", #           2
+                'navy',  # "sunglass", #       3
+                'red',  # "upper-clothes", #  4
+                'gold',  # "skirt",  #          5
+                'blue',  # "pants",  #          6
+                'seagreen',  # "dress", #          7
+                'darkorchid',  # "belt", #           8
+                'firebrick',  # "left-shoe", #      9
+                    'darksalmon',  # "right-shoe", #     10
+                    'moccasin',  # "face",  #           11
+                    'darkgreen',  # "left-leg", #       12
+                    'royalblue',  # "right-leg", #      13
+                    'chartreuse',  # "left-arm",#       14
+                    'paleturquoise',  # "right-arm", #      15
+                    'darkcyan',  # "bag", #            16
+                    'deepskyblue'  # "scarf" #          17
+                    ]
+
+clothnorm_10k = BoundaryNorm([-0.5, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5,
+                              7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5, 16.5, 17.5], 18)
+
+# colour map for LIP dataset
+lip_label_colours = [(0, 0, 0),  # 0=Background
+                     (128, 0, 0),  # 1=Hat
+                     (255, 0, 0),  # 2=Hair
+                     (0, 85, 0),  # 3=Glove
+                     (170, 0, 51),  # 4=Sunglasses
+                     (255, 85, 0),  # 5=UpperClothes
+                     (0, 0, 85),  # 6=Dress
+                     (0, 119, 221),  # 7=Coat
+                     (85, 85, 0),  # 8=Socks
+                     (0, 85, 85),  # 9=Pants
+                     (85, 51, 0),  # 10=Jumpsuits
+                     (52, 86, 128),  # 11=Scarf
+                     (0, 128, 0),  # 12=Skirt
+                     (0, 0, 255),  # 13=Face
+                     (51, 170, 221),  # 14=LeftArm
+                     (0, 255, 255),  # 15=RightArm
+                     (85, 255, 170),  # 16=LeftLeg
+                     (170, 255, 85),  # 17=RightLeg
+                     (255, 255, 0),  # 18=LeftShoe
+                     (255, 170, 0)  # 19=RightShoe
+                     ]
+
 
 """
    Optimization functions
@@ -113,18 +151,18 @@ def mode_visualize(sess, FLAGS, TEST_DIR, validation_dataset_reader, pred_annota
         print("Saved image: %d" % itr)
 
         # Eval metrics for this image prediction
-        cm = EvalMetrics._calcCrossMat(
+        cm = EvalMetrics.calculate_confusion_matrix(
             valid_annotations[itr].astype(
                 np.uint8), pred[itr].astype(
                 np.uint8), NUM_OF_CLASSES)
         crossMats.append(cm)
 
         """ Generate CRF """
-        crfimage, crfoutput = inference.crf(TEST_DIR + "inp_" + str(itr) + ".png", TEST_DIR + "pred_" + str(
+        crfimage, crfoutput = denseCRF.crf(TEST_DIR + "inp_" + str(itr) + ".png", TEST_DIR + "pred_" + str(
             itr) + ".png", TEST_DIR + "crf_" + str(itr) + ".png", NUM_OF_CLASSES, use_2d=True)
 
         # Eval metrics for this image prediction with crf
-        crf_cm = EvalMetrics._calcCrossMat(
+        crf_cm = EvalMetrics.calculate_confusion_matrix(
             valid_annotations[itr].astype(
                 np.uint8), crfoutput.astype(
                 np.uint8), NUM_OF_CLASSES)
@@ -311,7 +349,7 @@ def mode_test(sess, FLAGS, TEST_DIR, validation_dataset_reader, valid_records, p
             plt.title('Prediction')
 
             # Confusion matrix for this image prediction
-            crossMat = EvalMetrics._calcCrossMat(
+            crossMat = EvalMetrics.calculate_confusion_matrix(
                 valid_annotations[itr2].astype(
                     np.uint8), pred[itr2].astype(
                     np.uint8), NUM_OF_CLASSES)
@@ -337,11 +375,11 @@ def mode_test(sess, FLAGS, TEST_DIR, validation_dataset_reader, valid_records, p
 
             # --------------------------------------------------
             """ Generate CRF """
-            crfimage, crfoutput = inference.crf(TEST_DIR + "inp_" + str(itr1 * FLAGS.batch_size + itr2) + ".png", TEST_DIR + "pred_" + str(
+            crfimage, crfoutput = denseCRF.crf(TEST_DIR + "inp_" + str(itr1 * FLAGS.batch_size + itr2) + ".png", TEST_DIR + "pred_" + str(
                 itr1 * FLAGS.batch_size + itr2) + ".png", TEST_DIR + "crf_" + str(itr1 * FLAGS.batch_size + itr2) + ".png", NUM_OF_CLASSES, use_2d=True)
 
             # Confusion matrix for this image prediction with crf
-            crf_crossMat = EvalMetrics._calcCrossMat(
+            crf_crossMat = EvalMetrics.calculate_confusion_matrix(
                 valid_annotations[itr2].astype(
                     np.uint8), crfoutput.astype(
                     np.uint8), NUM_OF_CLASSES)
@@ -391,6 +429,500 @@ def mode_test(sess, FLAGS, TEST_DIR, validation_dataset_reader, valid_records, p
         print("\n")
         print(">>> Prediction results (CRF):")
         EvalMetrics.show_result(crf_total_cm, NUM_OF_CLASSES)
+
+    except Exception as err:
+        print(err)
+
+    end = time.time()
+    print("Testing time:", end - start, "seconds")
+
+
+def mode_crftest(sess, FLAGS, TEST_DIR, validation_dataset_reader, valid_records, pred_annotation, image, annotation, keep_probability, logits, NUM_OF_CLASSES):
+
+    accuracies = np.zeros(
+        (validation_dataset_reader.get_num_of_records(), 3, 2))
+    nFailed = 0
+    validation_dataset_reader.reset_batch_offset(0)
+    probability = tf.nn.softmax(logits=logits, axis=3)  # the axis!
+
+    for itr1 in range(validation_dataset_reader.get_num_of_records() // FLAGS.batch_size):
+        valid_images, valid_annotations = validation_dataset_reader.next_batch(
+            FLAGS.batch_size)
+
+        predprob, pred = sess.run([probability, pred_annotation], feed_dict={image: valid_images, annotation: valid_annotations,
+                                                                             keep_probability: 1.0})
+        np.set_printoptions(threshold=10)
+        valid_annotations = np.squeeze(valid_annotations, axis=3)
+        pred = np.squeeze(pred)
+        predprob = np.squeeze(predprob)
+
+        # @TODO: convert np once not repeatedly
+        for itr2 in range(FLAGS.batch_size):
+
+            # 1. run CRF
+            crfwithlabeloutput = denseCRF.crf_with_labels(valid_images[itr2].astype(
+                np.uint8), pred[itr2].astype(np.uint8), NUM_OF_CLASSES)
+            crfwithprobsoutput = denseCRF.crf_with_probs(
+                valid_images[itr2].astype(np.uint8), predprob[itr2], NUM_OF_CLASSES)
+
+            original = valid_images[itr2].astype(np.uint8)
+            groundtruth = valid_annotations[itr2].astype(np.uint8)
+            fcnpred = pred[itr2].astype(np.uint8)
+            crfwithlabelpred = crfwithlabeloutput.astype(np.uint8)
+            crfwithprobspred = crfwithprobsoutput.astype(np.uint8)
+
+            # 2. Calculate confusion matrix between gtimage and prediction image and store to file
+            pred_confusion_matrix = EvalMetrics.calculate_confusion_matrix(
+                groundtruth, fcnpred, NUM_OF_CLASSES)
+            crfwithlabelpred_confusion_matrix = EvalMetrics.calculate_confusion_matrix(
+                groundtruth, crfwithlabelpred, NUM_OF_CLASSES)
+            crfwithprobspred_confusion_matrix = EvalMetrics.calculate_confusion_matrix(
+                groundtruth, crfwithprobspred, NUM_OF_CLASSES)
+
+            accuracies[itr1*FLAGS.batch_size +
+                       itr2][0] = EvalMetrics.calcuate_accuracy(pred_confusion_matrix, False)
+            accuracies[itr1*FLAGS.batch_size + itr2][1] = EvalMetrics.calcuate_accuracy(
+                crfwithlabelpred_confusion_matrix, False)
+            accuracies[itr1*FLAGS.batch_size + itr2][2] = EvalMetrics.calcuate_accuracy(
+                crfwithprobspred_confusion_matrix, True)
+
+            T_full = 0.9
+            T_fgnd = 0.85
+            if accuracies[itr1 * FLAGS.batch_size + itr2][2][1] < T_full or accuracies[itr1 * FLAGS.batch_size + itr2][2][0] < T_fgnd:
+                nFailed += 1
+                print("Failed Image (%d-th): %d" %
+                      (nFailed, itr1*FLAGS.batch_size + itr2))
+
+            # 4. saving result
+            # now we have 0-index image
+            filenum = str(itr1 * FLAGS.batch_size + itr2)
+
+            Utils.save_image(original, FLAGS.logs_dir,
+                             name="in_" + filenum)
+            Utils.save_image(
+                groundtruth, TEST_DIR, name="gt_" + filenum)
+            Utils.save_image(crfwithprobspred,
+                             TEST_DIR, name="crf_" + filenum)
+
+            # ---End calculate cross matrix
+            print("Saved image: %s" % filenum)
+
+    np.save(FLAGS.logs_dir + "accuracy", accuracies)
+
+
+def mode_predonly(sess, FLAGS, TEST_DIR, validation_dataset_reader, valid_records, pred_annotation, image, annotation, keep_probability, logits, NUM_OF_CLASSES):
+
+    nFailed = 0
+    validation_dataset_reader.reset_batch_offset(0)
+    probability = tf.nn.softmax(logits=logits, axis=3)  # the axis!
+
+    for itr1 in range(validation_dataset_reader.get_num_of_records() // FLAGS.batch_size):
+        valid_images, _ = validation_dataset_reader.next_batch(
+            FLAGS.batch_size)
+
+        predprob, pred = sess.run([probability, pred_annotation], feed_dict={
+                                  image: valid_images, keep_probability: 1.0})
+
+        np.set_printoptions(threshold=10)
+
+        pred = np.squeeze(pred)
+        predprob = np.squeeze(predprob)
+
+        # @TODO: convert np once not repeatedly
+        for itr2 in range(FLAGS.batch_size):
+
+            # 1. run CRF
+            crfwithlabeloutput = denseCRF.crf_with_labels(valid_images[itr2].astype(
+                np.uint8), pred[itr2].astype(np.uint8), NUM_OF_CLASSES)
+            crfwithprobsoutput = denseCRF.crf_with_probs(
+                valid_images[itr2].astype(np.uint8), predprob[itr2], NUM_OF_CLASSES)
+
+            # 2. show result display
+            orignal = valid_images[itr2].astype(np.uint8)
+            fcnpred = pred[itr2].astype(np.uint8)
+            crfwithlabelpred = crfwithlabeloutput.astype(np.uint8)
+            crfwithprobspred = crfwithprobsoutput.astype(np.uint8)
+
+            # 4. saving result
+            # now we have 0-index image
+            filenum = str(itr1 * FLAGS.batch_size + itr2)
+
+            # Utils.save_image(orignal, TEST_DIR, name="in_" + filenum)
+            Utils.save_image(crfwithprobspred, TEST_DIR,
+                             name="probcrf_" + filenum)
+            Utils.save_image(crfwithlabelpred, TEST_DIR,
+                             name="labelcrf_" + filenum)
+
+            # ---End calculate cross matrix
+            print("Saved image: %s" % filenum)
+
+
+def mode_full_test(sess, flags, save_dir, validation_dataset_reader, valid_records, pred_annotation, image, annotation, keep_probability, logits, num_classes):
+    print(">>>>>>>>>>>>>>>>Test mode")
+    start = time.time()
+
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    validation_dataset_reader.reset_batch_offset(0)
+    probability = tf.nn.softmax(logits=logits, axis=3)
+
+    crossMats = list()
+    label_crf_crossMats = list()
+    prob_crf_crossMats = list()
+
+    for itr1 in range(validation_dataset_reader.get_num_of_records() // flags.batch_size):
+
+        valid_images, valid_annotations = validation_dataset_reader.next_batch(
+            flags.batch_size)
+
+        predprob, pred = sess.run([probability, pred_annotation], feed_dict={
+            image: valid_images, keep_probability: 1.0})
+
+        np.set_printoptions(threshold=10)
+
+        pred = np.squeeze(pred)
+        predprob = np.squeeze(predprob)
+        valid_annotations = np.squeeze(valid_annotations, axis=3)
+
+        for itr2 in range(flags.batch_size):
+
+            fig = plt.figure()
+            pos = 240 + 1
+            plt.subplot(pos)
+            plt.imshow(valid_images[itr2].astype(np.uint8))
+            plt.axis('off')
+            plt.title('Original')
+
+            pos = 240 + 2
+            plt.subplot(pos)
+            # plt.imshow(valid_annotations[itr2].astype(np.uint8), cmap=plt.get_cmap('nipy_spectral'))
+            plt.imshow(valid_annotations[itr2].astype(
+                np.uint8), cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
+            plt.axis('off')
+            plt.title('GT')
+
+            pos = 240 + 3
+            plt.subplot(pos)
+            # plt.imshow(pred[itr2].astype(np.uint8), cmap=plt.get_cmap('nipy_spectral'))
+            plt.imshow(pred[itr2].astype(np.uint8),
+                       cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
+            plt.axis('off')
+            plt.title('Prediction')
+
+            # Confusion matrix for this image prediction
+            crossMat = EvalMetrics.calculate_confusion_matrix(
+                valid_annotations[itr2].astype(
+                    np.uint8), pred[itr2].astype(
+                    np.uint8), num_classes)
+            crossMats.append(crossMat)
+
+            np.savetxt(save_dir +
+                       "Crossmatrix" +
+                       str(itr1 *
+                           flags.batch_size +
+                           itr2) +
+                       ".csv", crossMat, fmt='%4i', delimiter=',')
+
+            # Save input, gt, pred, crf_pred, sum figures for this image
+
+            """ Generate CRF """
+            # 1. run CRF
+            crfwithlabeloutput = denseCRF.crf_with_labels(valid_images[itr2].astype(
+                np.uint8), pred[itr2].astype(np.uint8), num_classes)
+            crfwithprobsoutput = denseCRF.crf_with_probs(
+                valid_images[itr2].astype(np.uint8), predprob[itr2], num_classes)
+
+            # 2. show result display
+            crfwithlabelpred = crfwithlabeloutput.astype(np.uint8)
+            crfwithprobspred = crfwithprobsoutput.astype(np.uint8)
+
+            # -----------------------Save inp and masks----------------------
+            Utils.save_image(valid_images[itr2].astype(np.uint8), save_dir,
+                             name="inp_" + str(itr1 * flags.batch_size + itr2))
+            Utils.save_image(valid_annotations[itr2].astype(np.uint8), save_dir,
+                             name="gt_" + str(itr1 * flags.batch_size + itr2))
+            Utils.save_image(pred[itr2].astype(np.uint8),
+                             save_dir,
+                             name="pred_" + str(itr1 * flags.batch_size + itr2))
+            Utils.save_image(crfwithprobspred, save_dir,
+                             name="probcrf_" + str(itr1 * flags.batch_size + itr2))
+            Utils.save_image(crfwithlabelpred, save_dir,
+                             name="labelcrf_" + str(itr1 * flags.batch_size + itr2))
+
+            # ----------------------Save visualized masks---------------------
+            Utils.save_visualized_image(valid_annotations[itr2].astype(np.uint8), save_dir,
+                                        image_name="gt_" + str(itr1 * flags.batch_size + itr2), n_classes=num_classes)
+            Utils.save_visualized_image(pred[itr2].astype(np.uint8),
+                                        save_dir,
+                                        image_name="pred_" + str(itr1 * flags.batch_size + itr2), n_classes=num_classes)
+            Utils.save_visualized_image(crfwithprobspred, save_dir, image_name="probcrf_" + str(
+                itr1 * flags.batch_size + itr2), n_classes=num_classes)
+            Utils.save_visualized_image(crfwithlabelpred, save_dir, image_name="labelcrf_" + str(
+                itr1 * flags.batch_size + itr2), n_classes=num_classes)
+
+            # --------------------------------------------------
+
+            # Confusion matrix for this image prediction with crf
+            prob_crf_crossMat = EvalMetrics.calculate_confusion_matrix(
+                valid_annotations[itr2].astype(
+                    np.uint8), crfwithprobsoutput.astype(
+                    np.uint8), num_classes)
+            prob_crf_crossMats.append(prob_crf_crossMat)
+
+            label_crf_crossMat = EvalMetrics.calculate_confusion_matrix(
+                valid_annotations[itr2].astype(
+                    np.uint8), crfwithlabeloutput.astype(
+                    np.uint8), num_classes)
+            label_crf_crossMats.append(label_crf_crossMat)
+
+            np.savetxt(save_dir +
+                       "prob_crf_Crossmatrix" +
+                       str(itr1 *
+                           flags.batch_size +
+                           itr2) +
+                       ".csv", prob_crf_crossMat, fmt='%4i', delimiter=',')
+
+            np.savetxt(save_dir +
+                       "label_crf_Crossmatrix" +
+                       str(itr1 *
+                           flags.batch_size +
+                           itr2) +
+                       ".csv", label_crf_crossMat, fmt='%4i', delimiter=',')
+
+            pos = 240 + 4
+            plt.subplot(pos)
+            # plt.imshow(crfwithprobsoutput.astype(np.uint8), cmap=plt.get_cmap('nipy_spectral'))
+            plt.imshow(crfwithprobsoutput.astype(np.uint8),
+                       cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
+            plt.axis('off')
+            plt.title('Prediction + CRF (prob)')
+
+            pos = 240 + 5
+            plt.subplot(pos)
+            # plt.imshow(crfwithlabeloutput.astype(np.uint8), cmap=plt.get_cmap('nipy_spectral'))
+            plt.imshow(crfwithlabeloutput.astype(np.uint8),
+                       cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
+            plt.axis('off')
+            plt.title('Prediction + CRF (label)')
+
+            plt.savefig(save_dir + "resultSum_" +
+                        str(itr1 * flags.batch_size + itr2))
+
+            plt.close('all')
+            print("Saved image: %d" % (itr1 * flags.batch_size + itr2))
+
+    try:
+        total_cm = np.sum(crossMats, axis=0)
+        np.savetxt(
+            flags.logs_dir +
+            "Crossmatrix.csv",
+            total_cm,
+            fmt='%4i',
+            delimiter=',')
+
+        print(">>> Prediction results:")
+        EvalMetrics.show_result(total_cm, num_classes)
+
+        # Prediction with CRF
+        prob_crf_total_cm = np.sum(prob_crf_crossMats, axis=0)
+        np.savetxt(
+            flags.logs_dir +
+            "prob_CRF_Crossmatrix.csv",
+            prob_crf_total_cm,
+            fmt='%4i',
+            delimiter=',')
+
+        label_crf_total_cm = np.sum(label_crf_crossMats, axis=0)
+        np.savetxt(
+            flags.logs_dir +
+            "label_CRF_Crossmatrix.csv",
+            label_crf_total_cm,
+            fmt='%4i',
+            delimiter=',')
+
+        print("\n")
+        print(">>> Prediction results (CRF (prob)):")
+        EvalMetrics.show_result(prob_crf_total_cm, num_classes)
+
+        print("\n")
+        print(">>> Prediction results (CRF (label)):")
+        EvalMetrics.show_result(label_crf_total_cm, num_classes)
+
+    except Exception as err:
+        print(err)
+
+    end = time.time()
+    print("Testing time:", end - start, "seconds")
+
+
+def mode_new_test(sess, flags, save_dir, validation_dataset_reader, valid_records, pred_annotation, image, annotation, keep_probability, logits, num_classes):
+    print(">>>>>>>>>>>>>>>>Test mode")
+    start = time.time()
+
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    validation_dataset_reader.reset_batch_offset(0)
+    probability = tf.nn.softmax(logits=logits, axis=3)
+
+    cross_mats = list()
+    crf_cross_mats = list()
+
+    # tf_pixel_acc_list = []
+    # tf_miou_list = []
+
+    # pixel_acc_op, pixel_acc_update_op = tf.metrics.accuracy(labels=annotation, predictions=pred_annotation)
+    # mean_iou_op, mean_iou_update_op = tf.metrics.mean_iou(labels=annotation, predictions=pred_annotation, num_classes=num_classes)
+
+    for itr1 in range(validation_dataset_reader.get_num_of_records() // flags.batch_size):
+
+        valid_images, valid_annotations = validation_dataset_reader.next_batch(
+            flags.batch_size)
+
+        predprob, pred = sess.run([probability, pred_annotation], feed_dict={image: valid_images, keep_probability: 1.0})
+
+        # tf measures
+        sess.run(tf.local_variables_initializer())
+        feed_dict = {image: valid_images, annotation: valid_annotations, keep_probability: 1.0}
+        # predprob, pred, _, __ = sess.run([probability, pred_annotation, pixel_acc_update_op, mean_iou_update_op], feed_dict=feed_dict)
+        # tf_pixel_acc, tf_miou = sess.run([pixel_acc_op, mean_iou_op], feed_dict=feed_dict)
+        # tf_pixel_acc_list.append(tf_pixel_acc)
+        # tf_miou_list.append(tf_miou)
+
+        np.set_printoptions(threshold=10)
+
+        pred = np.squeeze(pred)
+        predprob = np.squeeze(predprob)
+        valid_annotations = np.squeeze(valid_annotations, axis=3)
+
+        for itr2 in range(flags.batch_size):
+
+            fig = plt.figure()
+            pos = 240 + 1
+            plt.subplot(pos)
+            plt.imshow(valid_images[itr2].astype(np.uint8))
+            plt.axis('off')
+            plt.title('Original')
+
+            pos = 240 + 2
+            plt.subplot(pos)
+            # plt.imshow(valid_annotations[itr2].astype(np.uint8), cmap=plt.get_cmap('nipy_spectral'))
+            plt.imshow(valid_annotations[itr2].astype(
+                np.uint8), cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
+            plt.axis('off')
+            plt.title('GT')
+
+            pos = 240 + 3
+            plt.subplot(pos)
+            # plt.imshow(pred[itr2].astype(np.uint8), cmap=plt.get_cmap('nipy_spectral'))
+            plt.imshow(pred[itr2].astype(np.uint8),
+                       cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
+            plt.axis('off')
+            plt.title('Prediction')
+
+            # Confusion matrix for this image prediction
+            crossMat = EvalMetrics.calculate_confusion_matrix(
+                valid_annotations[itr2].astype(
+                    np.uint8), pred[itr2].astype(
+                    np.uint8), num_classes)
+            cross_mats.append(crossMat)
+
+            np.savetxt(save_dir +
+                       "Crossmatrix" +
+                       str(itr1 *
+                           flags.batch_size +
+                           itr2) +
+                       ".csv", crossMat, fmt='%4i', delimiter=',')
+
+            # Save input, gt, pred, crf_pred, sum figures for this image
+
+            """ Generate CRF """
+            # 1. run CRF
+            crfwithprobsoutput = denseCRF.crf_with_probs(
+                valid_images[itr2].astype(np.uint8), predprob[itr2], num_classes)
+
+            # 2. show result display
+            crfwithprobspred = crfwithprobsoutput.astype(np.uint8)
+
+            # -----------------------Save inp and masks----------------------
+            Utils.save_image(valid_images[itr2].astype(np.uint8), save_dir,
+                             name="inp_" + str(itr1 * flags.batch_size + itr2))
+            Utils.save_image(valid_annotations[itr2].astype(np.uint8), save_dir,
+                             name="gt_" + str(itr1 * flags.batch_size + itr2))
+            Utils.save_image(pred[itr2].astype(np.uint8),
+                             save_dir,
+                             name="pred_" + str(itr1 * flags.batch_size + itr2))
+            Utils.save_image(crfwithprobspred, save_dir,
+                             name="crf_" + str(itr1 * flags.batch_size + itr2))
+
+            # ----------------------Save visualized masks---------------------
+            Utils.save_visualized_image(valid_annotations[itr2].astype(np.uint8), save_dir,
+                                        image_name="gt_" + str(itr1 * flags.batch_size + itr2), n_classes=num_classes)
+            Utils.save_visualized_image(pred[itr2].astype(np.uint8),
+                                        save_dir,
+                                        image_name="pred_" + str(itr1 * flags.batch_size + itr2), n_classes=num_classes)
+            Utils.save_visualized_image(crfwithprobspred, save_dir, image_name="crf_" + str(
+                itr1 * flags.batch_size + itr2), n_classes=num_classes)
+
+            # --------------------------------------------------
+
+            # Confusion matrix for this image prediction with crf
+            prob_crf_crossMat = EvalMetrics.calculate_confusion_matrix(
+                valid_annotations[itr2].astype(
+                    np.uint8), crfwithprobsoutput.astype(
+                    np.uint8), num_classes)
+            crf_cross_mats.append(prob_crf_crossMat)
+
+            np.savetxt(save_dir +
+                       "prob_crf_Crossmatrix" +
+                       str(itr1 *
+                           flags.batch_size +
+                           itr2) +
+                       ".csv", prob_crf_crossMat, fmt='%4i', delimiter=',')
+
+            pos = 240 + 4
+            plt.subplot(pos)
+            # plt.imshow(crfwithprobsoutput.astype(np.uint8), cmap=plt.get_cmap('nipy_spectral'))
+            plt.imshow(crfwithprobsoutput.astype(np.uint8),
+                       cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
+            plt.axis('off')
+            plt.title('Prediction + CRF')
+
+            plt.savefig(save_dir + "resultSum_" +
+                        str(itr1 * flags.batch_size + itr2))
+
+            plt.close('all')
+            print("Saved image: %d" % (itr1 * flags.batch_size + itr2))
+
+    try:
+        total_cm = np.sum(cross_mats, axis=0)
+        np.savetxt(
+            flags.logs_dir +
+            "Crossmatrix.csv",
+            total_cm,
+            fmt='%4i',
+            delimiter=',')
+
+        # print("\n>>> Prediction results (TF functions):")
+        # print("Pixel acc:", np.nanmean(tf_pixel_acc_list))
+        # print("mean IoU:", np.nanmean(tf_miou_list))
+
+        print("\n>>> Prediction results:")
+        EvalMetrics.calculate_eval_metrics_from_confusion_matrix(total_cm, num_classes)
+
+        # Prediction with CRF
+        crf_total_cm = np.sum(crf_cross_mats, axis=0)
+        np.savetxt(
+            flags.logs_dir +
+            "CRF_Crossmatrix.csv",
+            crf_total_cm,
+            fmt='%4i',
+            delimiter=',')
+
+        print("\n")
+        print("\n>>> Prediction results (CRF):")
+        EvalMetrics.calculate_eval_metrics_from_confusion_matrix(crf_total_cm, num_classes)
 
     except Exception as err:
         print(err)

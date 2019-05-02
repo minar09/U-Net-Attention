@@ -1,4 +1,3 @@
-
 # Hide the warning messages about CPU/GPU
 import sys
 import scipy.io
@@ -10,11 +9,96 @@ import numpy as np
 import tensorflow as tf
 import os
 from functools import reduce
+from PIL import Image
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+# colour map for LIP dataset
+lip_label_colours = [(0, 0, 0),  # 0=Background
+                     (128, 0, 0),  # 1=Hat
+                     (255, 0, 0),  # 2=Hair
+                     (0, 85, 0),  # 3=Glove
+                     (170, 0, 51),  # 4=Sunglasses
+                     (255, 85, 0),  # 5=UpperClothes
+                     (0, 0, 85),  # 6=Dress
+                     (0, 119, 221),  # 7=Coat
+                     (85, 85, 0),  # 8=Socks
+                     (0, 85, 85),  # 9=Pants
+                     (85, 51, 0),  # 10=Jumpsuits
+                     (52, 86, 128),  # 11=Scarf
+                     (0, 128, 0),  # 12=Skirt
+                     (0, 0, 255),  # 13=Face
+                     (51, 170, 221),  # 14=LeftArm
+                     (0, 255, 255),  # 15=RightArm
+                     (85, 255, 170),  # 16=LeftLeg
+                     (170, 255, 85),  # 17=RightLeg
+                     (255, 255, 0),  # 18=LeftShoe
+                     (255, 170, 0)  # 19=RightShoe
+                     ]
+
+# colour map for 10k dataset
+dressup10k_label_colors = [(0, 0, 0),  # 'black', #  "background", #     0
+                           (160, 82, 45),  # 'sienna', #"hat", #            1
+                           (128, 128, 128),  # 'gray', #"hair", #           2
+                           (0, 0, 128),  # 'navy', #"sunglass", #       3
+                           (255, 0, 0),  # 'red',  #"upper-clothes", #  4
+                           (255, 215, 0),  # 'gold', #"skirt",  #          5
+                           (0, 0, 255),  # 'blue', #"pants",  #          6
+                           (46, 139, 87),  # 'seagreen', #"dress", #          7
+                           (153, 50, 204),  # 'darkorchid',  #"belt", #           8
+                           (178, 34, 34),  # 'firebrick',  #   "left-shoe", #      9
+                           # 'darksalmon', #"right-shoe", #     10
+                           (233, 150, 122),
+                           (255, 228, 181),  # 'moccasin', #"face",  #           11
+                           (0, 100, 0),  # 'darkgreen', #"left-leg", #       12
+                           (65, 105, 225),  # 'royalblue', #"right-leg", #      13
+                           (127, 255, 0),  # 'chartreuse', #"left-arm",#       14
+                           # 'paleturquoise',  #"right-arm", #      15
+                           (175, 238, 238),
+                           (0, 139, 139),  # 'darkcyan', #  "bag", #            16
+                           (0, 191, 255),  # 'deepskyblue' #"scarf" #          17
+                           ]
 
 # Utils used with tensorflow implemetation
 
 DEFAULT_PADDING = 'SAME'
+
+
+def decode_labels(mask, num_classes=18, num_images=1):
+    """Decode batch of segmentation masks.
+
+    Args:
+      mask: result of inference after taking argmax.
+      num_images: number of images to decode from the batch.
+      num_classes: number of classes
+    Returns:
+      A batch with num_images RGB images of the same size as the input.
+    """
+    label_colours = []
+    if num_classes == 20:
+        label_colours = lip_label_colours
+    elif num_classes == 18:
+        # label_colours = fashion_label_colours
+        label_colours = dressup10k_label_colors
+
+    mask = np.expand_dims(mask, axis=0)
+    mask = np.expand_dims(mask, axis=3)
+
+    n, h, w, c = mask.shape
+    assert (n >= num_images), 'Batch size %d should be greater or equal than number of images to save %d.' % (
+        n, num_images)
+    outputs = np.zeros((num_images, h, w, 3), dtype=np.uint8)
+
+    for i in range(num_images):
+        img = Image.new('RGB', (len(mask[i, 0]), len(mask[i])))
+        pixels = img.load()
+        for j_, j in enumerate(mask[i, :, :, 0]):
+            for k_, k in enumerate(j):
+                if k < num_classes:
+                    pixels[k_, j_] = label_colours[k]
+        outputs[i] = np.array(img)
+
+    return outputs[0]
 
 
 """
@@ -62,8 +146,8 @@ def maybe_download_and_extract(
                  float(
                      count *
                      block_size) /
-                    float(total_size) *
-                    100.0))
+                 float(total_size) *
+                 100.0))
             sys.stdout.flush()
 
         filepath, _ = urllib.request.urlretrieve(
@@ -97,6 +181,26 @@ def save_image(image, save_dir, name, mean=None):
     if mean:
         image = unprocess_image(image, mean)
     misc.imsave(os.path.join(save_dir, name + ".png"), image)
+
+
+def save_visualized_image(image_value, save_dir, image_name, n_classes=18, mean=None):
+    """
+    Save image by unprocessing if mean given else just save
+    :param n_classes:
+    :param mean:
+    :param image_value:
+    :param save_dir:
+    :param image_name:
+    :return:
+    """
+    if mean:
+        image_value = unprocess_image(image_value, mean)
+
+    msk = decode_labels(image_value, num_classes=n_classes)
+    parsing_im = Image.fromarray(msk)
+    parsing_im.save('{}/{}_vis.png'.format(save_dir, image_name))
+    # cv2.imwrite('{}/{}.png'.format(save_dir, name), parsing_[0, :, :, 0])
+    # misc.imsave(os.path.join(save_dir, name + ".png"), image)
 
 
 def get_variable(weights, name):
@@ -148,16 +252,17 @@ def atrous_conv(input,
                 group=1,
                 biased=True,
                 is_training=False):
-
     # Get the number of channels in the input
     c_i = input.get_shape()[-1]
     # Verify that the grouping parameter is valid
     assert c_i % group == 0
     assert c_o % group == 0
+
     # Convolution for a given input and kernel
 
-    def convolve(i, k): return tf.nn.atrous_conv2d(
-        i, k, dilation, padding=padding)
+    def convolve(i, k):
+        return tf.nn.atrous_conv2d(
+            i, k, dilation, padding=padding)
 
     with tf.variable_scope(name) as scope:
         kernel = make_var(
@@ -213,8 +318,8 @@ def _upsample_filters(filters, rate):
 
 
 def conv2d_transpose_strided(x, W, b, output_shape=None, stride=2):
-        # print x.get_shape()
-        # print W.get_shape()
+    # print x.get_shape()
+    # print W.get_shape()
     if output_shape is None:
         output_shape = x.get_shape().as_list()
         output_shape[1] *= 2
@@ -222,7 +327,7 @@ def conv2d_transpose_strided(x, W, b, output_shape=None, stride=2):
         output_shape[3] = W.get_shape().as_list()[2]
     # print output_shape
     conv = tf.nn.conv2d_transpose(x, W, output_shape, strides=[
-                                  1, stride, stride, 1], padding="SAME")
+        1, stride, stride, 1], padding="SAME")
     return tf.nn.bias_add(conv, b)
 
 
@@ -365,7 +470,7 @@ def bottleneck_unit(
                         shape=1,
                         strides=first_stride,
                         name='res%s_branch1' %
-                        name)
+                             name)
                 else:
                     b1 = conv(
                         x,
@@ -373,7 +478,7 @@ def bottleneck_unit(
                         shape=1,
                         strides=first_stride,
                         name='res%s_branch1' %
-                        name)
+                             name)
                 b1 = bn(b1, 'bn%s_branch1' % name, 'scale%s_branch1' % name)
 
         with tf.variable_scope('branch2a'):
@@ -384,7 +489,7 @@ def bottleneck_unit(
                     shape=1,
                     strides=first_stride,
                     name='res%s_branch2a' %
-                    name)
+                         name)
             else:
                 b2 = conv(
                     x,
@@ -392,7 +497,7 @@ def bottleneck_unit(
                     shape=1,
                     strides=first_stride,
                     name='res%s_branch2a' %
-                    name)
+                         name)
             b2 = bn(b2, 'bn%s_branch2a' % name, 'scale%s_branch2a' % name)
             b2 = tf.nn.relu(b2, name='relu')
 
@@ -403,7 +508,7 @@ def bottleneck_unit(
                 shape=3,
                 strides=1,
                 name='res%s_branch2b' %
-                name)
+                     name)
             b2 = bn(b2, 'bn%s_branch2b' % name, 'scale%s_branch2b' % name)
             b2 = tf.nn.relu(b2, name='relu')
 
@@ -414,7 +519,7 @@ def bottleneck_unit(
                 shape=1,
                 strides=1,
                 name='res%s_branch2c' %
-                name)
+                     name)
             b2 = bn(b2, 'bn%s_branch2c' % name, 'scale%s_branch2c' % name)
 
         x = b1 + b2
@@ -444,8 +549,8 @@ def conv(
         kernel_size=[
             3,
             3],
-    activation=tf.nn.relu,
-    l2_reg_scale=None,
+        activation=tf.nn.relu,
+        l2_reg_scale=None,
         batchnorm_istraining=None):
     if l2_reg_scale is None:
         regularizer = None
@@ -483,6 +588,12 @@ def pool(inputs):
         inputs=inputs, pool_size=[
             2, 2], strides=2)
     return pooled
+
+
+def dropout(inputs, prob):
+    dropout_applied = tf.nn.dropout(
+        inputs=inputs, rate=prob)
+    return dropout_applied
 
 
 def conv_transpose(inputs, filters, l2_reg_scale=None):

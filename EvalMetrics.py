@@ -96,7 +96,7 @@ def show_result(hist, n_cl=18):
 """
 
 
-def _calc_eval_metrics(gtimage, predimage, num_classes):
+def calculate_eval_metrics(gtimage, predimage, num_classes):
 
     pixel_accuracy_ = 0
     mean_accuracy = 0
@@ -135,27 +135,27 @@ def _calc_eval_metrics(gtimage, predimage, num_classes):
                     if predlabel >= num_classes or gtlabel >= num_classes:
                         print('gt:%d, pr:%d' % (gtlabel, predlabel))
                     else:
-                        if(gtlabel == label and predlabel == label):
+                        if gtlabel == label and predlabel == label:
                             intersection = intersection + 1
-                        if(gtlabel == label or predlabel == label):
+                        if gtlabel == label or predlabel == label:
                             union = union + 1
-                        if(gtlabel == label):
+                        if gtlabel == label:
                             gt_class = gt_class + 1
 
             # Calculate per class pixel accuracy
-            if (gt_class == 0):
+            if gt_class == 0:
                 per_class_pixel_accuracy[label] = 0
             else:
                 per_class_pixel_accuracy[label] = (
                     float)(intersection / gt_class)
 
             # Calculate per class IoU and FWIoU
-            if(union == 0):
+            if union == 0:
                 IoUs[label] = 0.0
                 FrqWIoU[label] = 0.0
             else:
-                IoUs[label] = (float)(intersection) / union
-                FrqWIoU[label] = (float)(intersection * gt_class) / union
+                IoUs[label] = float(intersection) / union
+                FrqWIoU[label] = float(intersection * gt_class) / union
 
             class_intersections.append(intersection)
             gt_pixels.append(gt_class)
@@ -165,12 +165,12 @@ def _calc_eval_metrics(gtimage, predimage, num_classes):
         meanIoU = np.mean(IoUs)
 
         # Calculate pixel accuracy and mean FWIoU
-        if (pixel_sum == 0):
+        if pixel_sum == 0:
             pixel_accuracy_ = 0
             meanFrqWIoU = 0
         else:
-            pixel_accuracy_ = (float)(np.sum(class_intersections)) / pixel_sum
-            meanFrqWIoU = (float)(np.sum(FrqWIoU)) / pixel_sum
+            pixel_accuracy_ = float(np.sum(class_intersections)) / pixel_sum
+            meanFrqWIoU = float(np.sum(FrqWIoU)) / pixel_sum
 
     except Exception as err:
         print(err)
@@ -183,9 +183,9 @@ def _calc_eval_metrics(gtimage, predimage, num_classes):
 """
 
 
-def _calc_eval_metrics_from_cross_matrix(gtimage, predimage, num_classes):
-    cross_mat = _calcCrossMat(gtimage, predimage, num_classes)
-    #cross_mat = fast_hist(gtimage, predimage, num_classes)
+def calculate_eval_metrics_from_images(gtimage, predimage, num_classes):
+    cross_mat = calculate_confusion_matrix(gtimage, predimage, num_classes)
+    # cross_mat = fast_hist(gtimage, predimage, num_classes)
 
     class_intersections = np.diag(cross_mat)
     total_intersections = np.nansum(class_intersections)
@@ -201,37 +201,53 @@ def _calc_eval_metrics_from_cross_matrix(gtimage, predimage, num_classes):
 
     for i in range(len(class_intersections)):
         try:
-            acc = (float)(class_intersections[i] / gt_pixels[i])
+            acc = float(class_intersections[i] / gt_pixels[i])
             class_accuracies.append(acc)
         except:
             class_accuracies.append(0)
 
         try:
-            iu = (float)(
+            iu = float(
                 class_intersections[i] / (gt_pixels[i] + pred_pixels[i] - class_intersections[i]))
             IoUs.append(iu)
         except:
             IoUs.append(0)
 
         try:
-            fwiu = (float)((class_intersections[i] * gt_pixels[i]) / (
+            fwiu = float((class_intersections[i] * gt_pixels[i]) / (
                 gt_pixels[i] + pred_pixels[i] - class_intersections[i]))
             FWIoUs.append(fwiu)
         except:
             FWIoUs.append(0)
 
-    pixel_accuracy_ = (float)(total_intersections /
-                              total_pixels)    # pixel accuracy
-    mean_accuracy = (float)(np.nansum(class_accuracies) /
-                            num_classes)    # mean accuracy
-    meanIoU = (float)(np.nansum(IoUs) / num_classes)    # mean IoU
+    pixel_accuracy_ = float(total_intersections /
+                            total_pixels)    # pixel accuracy
+    mean_accuracy = float(np.nansum(class_accuracies) /
+                          num_classes)    # mean accuracy
+    meanIoU = float(np.nansum(IoUs) / num_classes)    # mean IoU
     # Total frequency-weighted IoU
-    meanFrqWIoU = (float)(np.nansum(FWIoUs) / total_pixels)
+    meanFrqWIoU = float(np.nansum(FWIoUs) / total_pixels)
 
     return pixel_accuracy_, mean_accuracy, meanIoU, meanFrqWIoU, cross_mat
 
 
-def _calc_eval_metrics_from_confusion_matrix(cross_mat, num_classes):
+def calculate_eval_metrics_from_confusion_matrix(cross_mat, num_classes=18):
+    # Dressup 10K, 18 classes
+    classes = ['background', 'hat', 'hair', 'sunglasses', 'upperclothes', 'skirt', 'pants', 'dress',
+               'belt', 'leftShoe', 'rightShoe', 'face', 'leftLeg', 'rightLeg', 'leftArm', 'rightArm', 'bag', 'scarf']
+
+    # CFPD, 23 classes
+    if num_classes == 23:
+        classes = ['bk', 'T-shirt', 'bag', 'belt', 'blazer', 'blouse', 'coat', 'dress', 'face', 'hair',
+                   'hat', 'jeans', 'legging', 'pants', 'scarf', 'shoe', 'shorts', 'skin', 'skirt',
+                   'socks', 'stocking', 'sunglass', 'sweater']
+
+    # LIP, 20 classes
+    if num_classes == 20:
+        classes = ['background', 'hat', 'hair', 'glove', 'sunglasses', 'upperclothes',
+                   'dress', 'coat', 'socks', 'pants', 'jumpsuits', 'scarf', 'skirt',
+                   'face', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg', 'leftShoe',
+                   'rightShoe']
 
     class_intersections = np.diag(cross_mat)
     total_intersections = np.nansum(class_intersections)
@@ -247,30 +263,53 @@ def _calc_eval_metrics_from_confusion_matrix(cross_mat, num_classes):
 
     for i in range(len(class_intersections)):
         try:
-            acc = (float)(class_intersections[i] / gt_pixels[i])
+            acc = float(class_intersections[i] / gt_pixels[i])
             class_accuracies.append(acc)
         except:
             class_accuracies.append(0)
 
         try:
-            iu = (float)(
+            iu = float(
                 class_intersections[i] / (gt_pixels[i] + pred_pixels[i] - class_intersections[i]))
             IoUs.append(iu)
 
-            fwiu = (float)((gt_pixels[i] * iu) / total_pixels)
+            fwiu = float((gt_pixels[i] * iu) / total_pixels)
             FWIoUs.append(fwiu)
         except:
             IoUs.append(0)
             FWIoUs.append(0)
 
-    pixel_accuracy_ = (float)(total_intersections /
-                              total_pixels)    # pixel accuracy
-    mean_accuracy = (float)(np.nansum(class_accuracies) /
-                            num_classes)    # mean accuracy
-    meanIoU = (float)(np.nansum(IoUs) / num_classes)    # mean IoU
-    meanFrqWIoU = np.nansum(FWIoUs)    # Total frequency-weighted IoU
+    # pixel accuracy
+    pixel_accuracy_ = float(total_intersections /
+                            total_pixels)
+    print('>>>', 'overall/pixel accuracy', pixel_accuracy_)
+    print('-' * 50)
 
-    return pixel_accuracy_, mean_accuracy, meanIoU, meanFrqWIoU, cross_mat
+    # mean accuracy
+    print('Accuracy for each class:')
+    for i in range(len(class_accuracies)):
+        print('%-15s: %f' % (classes[i], class_accuracies[i]))
+
+    mean_accuracy = float(np.nansum(class_accuracies) /
+                          num_classes)
+    print('>>>', 'mean accuracy', np.nanmean(mean_accuracy))
+    print('-' * 50)
+
+    # mean IoU
+    print('IoU for each class:')
+    for i in range(len(IoUs)):
+        print('%-15s: %f' % (classes[i], IoUs[i]))
+
+    meanIoU = float(np.nansum(IoUs) / num_classes)
+    print('>>>', 'mean IoU', np.nanmean(meanIoU))
+    print('-' * 50)
+
+    # Total frequency-weighted IoU
+    meanFrqWIoU = np.nansum(FWIoUs)
+    print('>>>', 'Freq Weighted IoU', meanFrqWIoU)
+    print('=' * 50)
+
+    return pixel_accuracy_, mean_accuracy, meanIoU, meanFrqWIoU
 
 
 """
@@ -278,7 +317,7 @@ def _calc_eval_metrics_from_confusion_matrix(cross_mat, num_classes):
 """
 
 
-def _calc_pixel_accuracy(gtimage, predimage, num_classes):
+def calculate_pixel_accuracy(gtimage, predimage, num_classes):
     '''
     sum_i(n_ii) / sum_i(t_i)
     '''
@@ -318,10 +357,10 @@ def _calc_pixel_accuracy(gtimage, predimage, num_classes):
 
             class_intersections.append(intersection)
 
-        if (pixel_sum == 0):
+        if pixel_sum == 0:
             pixel_accuracy_ = 0
         else:
-            pixel_accuracy_ = (float)(np.sum(class_intersections)) / pixel_sum
+            pixel_accuracy_ = float(np.sum(class_intersections)) / pixel_sum
 
     except Exception as err:
         print(err)
@@ -329,12 +368,33 @@ def _calc_pixel_accuracy(gtimage, predimage, num_classes):
     return pixel_accuracy_, np.mean(per_class_pixel_accuracy)
 
 
+def calcuate_accuracy(mat, bprint=True):
+
+    n = len(mat)
+
+    acc = 0
+    tot = 0
+    for i in range(1, n):
+        acc += mat[i][i]
+        tot += sum(mat[i])
+    acc1 = acc/tot
+
+    if bprint:
+        print("Acc-fg: %5.3f (%d/%d)" % (acc/tot, acc, tot))
+    acc += mat[0][0]
+    tot += sum(mat[0])
+    if bprint:
+        print("Acc-all: %5.3f (%d/%d)" % (acc/tot, acc, tot))
+
+    return acc1, acc/tot  # fg accuracy, total accuracy
+
+
 """
     calculate IoU
 """
 
 
-def _calcIOU(gtimage, predimage, num_classes):
+def calculate_iou(gtimage, predimage, num_classes):
     IoUs = []
     for i in range(num_classes):
         IoUs.append([0] * num_classes)
@@ -355,17 +415,17 @@ def _calcIOU(gtimage, predimage, num_classes):
                 if predlabel >= num_classes or gtlabel >= num_classes:
                     print('gt:%d, pr:%d' % (gtlabel, predlabel))
                 else:
-                    if(gtlabel == label and predlabel == label):
+                    if gtlabel == label and predlabel == label:
                         intersection = intersection + 1
-                    if(gtlabel == label or predlabel == label):
+                    if gtlabel == label or predlabel == label:
                         union = union + 1
 
-        if(union == 0):
+        if union == 0:
             IoUs[label] = 0.0
         else:
             # print("label:", label , "intersection:", intersection, " -
             # union:", union)
-            IoUs[label] = (float)(intersection) / union
+            IoUs[label] = float(intersection) / union
 
     return IoUs
 
@@ -375,26 +435,26 @@ def _calcIOU(gtimage, predimage, num_classes):
 """
 
 
-def _calcCrossMat(gtimage, predimage, num_classes):
-    crossMat = []
+def calculate_confusion_matrix(gt_image, predicted_image, num_classes):
+    cross_mat = []
 
     for i in range(num_classes):
-        crossMat.append([0] * num_classes)
-    # print(crossMat)
-    height, width = gtimage.shape
+        cross_mat.append([0] * num_classes)
+    # print(cross_mat)
+    height, width = gt_image.shape
 
     for y in range(height):
-        # print(crossMat)
+        # print(cross_mat)
 
         for x in range(width):
-            gtlabel = gtimage[y, x]
-            predlabel = predimage[y, x]
+            gtlabel = gt_image[y, x]
+            predlabel = predicted_image[y, x]
             if predlabel >= num_classes or gtlabel >= num_classes:
                 print('gt:%d, pr:%d' % (gtlabel, predlabel))
             else:
-                crossMat[gtlabel][predlabel] = crossMat[gtlabel][predlabel] + 1
+                cross_mat[gtlabel][predlabel] = cross_mat[gtlabel][predlabel] + 1
 
-    return crossMat
+    return cross_mat
 
 
 """
@@ -402,7 +462,7 @@ def _calcCrossMat(gtimage, predimage, num_classes):
 """
 
 
-def _calcFrequencyWeightedIOU(gtimage, predimage, num_classes):
+def calculate_frequency_weighted_iou(gtimage, predimage, num_classes):
     FrqWIoU = []
     for i in range(num_classes):
         FrqWIoU.append([0] * num_classes)
@@ -426,15 +486,15 @@ def _calcFrequencyWeightedIOU(gtimage, predimage, num_classes):
                 if predlabel >= num_classes or gtlabel >= num_classes:
                     print('gt:%d, pr:%d' % (gtlabel, predlabel))
                 else:
-                    if(gtlabel == label and predlabel == label):
+                    if gtlabel == label and predlabel == label:
                         intersection = intersection + 1
                         gt = gt + 1
                         pred = pred + 1
-                    elif(gtlabel == label or predlabel == label):
+                    elif gtlabel == label or predlabel == label:
                         union = union + 1
-                        if(gtlabel == label):
+                        if gtlabel == label:
                             gt = gt + 1
-                        elif(predlabel == label):
+                        elif predlabel == label:
                             pred = pred + 1
 
                 gt_pixels.append(gt)
@@ -443,16 +503,16 @@ def _calcFrequencyWeightedIOU(gtimage, predimage, num_classes):
         # intersection = gt * pred
         # FrqWIoU[label] = (float)(intersection * gt) / union
 
-        if(union == 0):
+        if union == 0:
             FrqWIoU[label] = 0.0
         else:
-            FrqWIoU[label] = (float)(intersection * gt) / union
+            FrqWIoU[label] = float(intersection * gt) / union
 
-    #pixel_sum = np.sum(gt_pixels)
+    # pixel_sum = np.sum(gt_pixels)
     pixel_sum = get_pixel_area(gtimage)
-    #pixel_sum = predimage.shape[0] * predimage[1]
+    # pixel_sum = predimage.shape[0] * predimage[1]
 
-    meanFrqWIoU = (float)(np.sum(FrqWIoU)) / pixel_sum
+    meanFrqWIoU = float(np.sum(FrqWIoU)) / pixel_sum
 
     return FrqWIoU, meanFrqWIoU
 
@@ -542,13 +602,14 @@ class AverageMeter(object):
     """Computes and stores the average and current value"""
 
     def __init__(self):
+        self.count = 0
+        self.sum = 0
+        self.avg = 0
+        self.val = 0
         self.reset()
 
     def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
+        pass
 
     def update(self, val, n=1):
         self.val = val

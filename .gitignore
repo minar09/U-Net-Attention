@@ -1,10 +1,6 @@
-datasets/
-checkpoint/
-output/
-logs/
-model/
 .idea/
-*.pyc
+logs/
+Model_zoo/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
