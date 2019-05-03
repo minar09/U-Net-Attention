@@ -60,9 +60,9 @@ tf.flags.DEFINE_float(
 tf.flags.DEFINE_string("model_dir", "Model_zoo/", "Path to vgg model mat")
 tf.flags.DEFINE_bool('debug', "False", "Debug mode: True/ False")
 
-tf.flags.DEFINE_string('mode', "train", "Mode train/ test/ visualize")
+# tf.flags.DEFINE_string('mode', "train", "Mode train/ test/ visualize")
 # tf.flags.DEFINE_string('mode', "test", "Mode train/ test/ visualize")
-# tf.flags.DEFINE_string('mode', "visualize", "Mode train/ test/ visualize")
+tf.flags.DEFINE_string('mode', "visualize", "Mode train/ test/ visualize")
 # tf.flags.DEFINE_string('mode', "predonly", "Mode train/ test/ visualize")
 # tf.flags.DEFINE_string('mode', "fulltest", "Mode train/ test/ visualize")
 
@@ -196,7 +196,7 @@ def attention(scale_input, is_training=False):
         dropout_ratio = 0.5
 
     conv1 = Utils.conv(scale_input, filters=512, l2_reg_scale=l2_reg)
-    conv1 = Utils.dropout(conv1, dropout_ratio)
+    conv1 = Utils.dropout(conv1, dropout_ratio, is_training)
     conv2 = Utils.conv(conv1, filters=3, kernel_size=[1, 1], l2_reg_scale=l2_reg)
     return conv2
 
@@ -464,7 +464,7 @@ def main(argv=None):
     elif FLAGS.mode == "visualize":
 
         fd.mode_visualize(sess, FLAGS, VIS_DIR, validation_dataset_reader,
-                          final_annotation_pred_test, score_att_x, image, annotation, keep_probability, NUM_OF_CLASSES)
+                          final_annotation_pred_test, attn_output_test, pred_annotation050, pred_annotation075, pred_annotation125, image, annotation, keep_probability, NUM_OF_CLASSES)
 
     # test-full-validation-dataset mode
     elif FLAGS.mode == "test":

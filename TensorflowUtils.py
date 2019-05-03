@@ -590,9 +590,9 @@ def pool(inputs):
     return pooled
 
 
-def dropout(inputs, prob):
-    dropout_applied = tf.nn.dropout(
-        inputs=inputs, rate=prob)
+def dropout(inputs, prob, is_training=False):
+    dropout_applied = tf.layers.dropout(
+        inputs=inputs, rate=prob, training=is_training)
     return dropout_applied
 
 
