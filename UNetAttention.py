@@ -1,11 +1,11 @@
 from __future__ import print_function
 
 import BatchDatsetReader as DataSetReader
-import read_10k_data as fashion_parsing
-import read_CFPD_data as ClothingParsing
-import read_LIP_data as HumanParsing
+import Read10kData as fashion_parsing
+import ReadCFPDdata as ClothingParsing
+import ReadLIPdata as HumanParsing
 import TensorflowUtils as Utils
-import function_definitions as fd
+import FunctionDefinitions as fd
 
 import tensorflow as tf
 
@@ -464,7 +464,7 @@ def main(argv=None):
     elif FLAGS.mode == "visualize":
 
         fd.mode_visualize(sess, FLAGS, VIS_DIR, validation_dataset_reader,
-                          final_annotation_pred_test, image, annotation, keep_probability, NUM_OF_CLASSES)
+                          final_annotation_pred_test, score_att_x, image, annotation, keep_probability, NUM_OF_CLASSES)
 
     # test-full-validation-dataset mode
     elif FLAGS.mode == "test":

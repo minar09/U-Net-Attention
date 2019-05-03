@@ -113,41 +113,26 @@ def vgg_net(weights, image):
     return net
 
 
-def mode_visualize(sess, FLAGS, TEST_DIR, validation_dataset_reader, pred_annotation, image, annotation, keep_probability, NUM_OF_CLASSES):
+def mode_visualize(sess, FLAGS, TEST_DIR, validation_dataset_reader, pred_annotation, score_att_x, image, annotation, keep_probability, NUM_OF_CLASSES):
     if not os.path.exists(TEST_DIR):
         os.makedirs(TEST_DIR)
 
     valid_images, valid_annotations = validation_dataset_reader.get_random_batch(
         FLAGS.batch_size)
-    pred = sess.run(pred_annotation,
+    pred, weights = sess.run([pred_annotation, score_att_x],
                     feed_dict={image: valid_images, annotation: valid_annotations,
                                keep_probability: 1.0})
-
-    # pixel_acc_op, pixel_acc_update_op = tf.metrics.accuracy(labels=annotation, predictions=pred_annotation)
-    # mean_iou_op, mean_iou_update_op = tf.metrics.mean_iou(labels=annotation, predictions=pred_annotation, num_classes=NUM_OF_CLASSES)
-
-    # sess.run(tf.local_variables_initializer())
-    # feed_dict={image: valid_images, annotation: valid_annotations, keep_probability: 1.0}
-    # sess.run(
-    # [pixel_acc_update_op, mean_iou_update_op],
-    # feed_dict=feed_dict)
-    # pixel_acc, tf_miou = sess.run(
-    # [pixel_acc_op, mean_iou_op],
-    # feed_dict=feed_dict)
 
     valid_annotations = np.squeeze(valid_annotations, axis=3)
     pred = np.squeeze(pred, axis=3)
 
     crossMats = list()
-    crf_crossMats = list()
 
     for itr in range(FLAGS.batch_size):
-        Utils.save_image(valid_images[itr].astype(
-            np.uint8), TEST_DIR, name="inp_" + str(itr))
-        Utils.save_image(valid_annotations[itr].astype(
-            np.uint8) * 255 / NUM_OF_CLASSES, TEST_DIR, name="gt_" + str(itr))
-        Utils.save_image(pred[itr].astype(
-            np.uint8) * 255 / NUM_OF_CLASSES, TEST_DIR, name="pred_" + str(itr))
+        Utils.save_image(valid_images[itr].astype(np.uint8), TEST_DIR, name="inp_" + str(itr))
+        Utils.save_image(valid_annotations[itr].astype(np.uint8), TEST_DIR, name="gt_" + str(itr))
+        Utils.save_image(pred[itr].astype(np.uint8), TEST_DIR, name="pred_" + str(itr))
+        Utils.save_image(weights[itr].astype(np.uint8), TEST_DIR, name="weights_" + str(itr))
         print("Saved image: %d" % itr)
 
         # Eval metrics for this image prediction
@@ -157,25 +142,9 @@ def mode_visualize(sess, FLAGS, TEST_DIR, validation_dataset_reader, pred_annota
                 np.uint8), NUM_OF_CLASSES)
         crossMats.append(cm)
 
-        """ Generate CRF """
-        crfimage, crfoutput = denseCRF.crf(TEST_DIR + "inp_" + str(itr) + ".png", TEST_DIR + "pred_" + str(
-            itr) + ".png", TEST_DIR + "crf_" + str(itr) + ".png", NUM_OF_CLASSES, use_2d=True)
-
-        # Eval metrics for this image prediction with crf
-        crf_cm = EvalMetrics.calculate_confusion_matrix(
-            valid_annotations[itr].astype(
-                np.uint8), crfoutput.astype(
-                np.uint8), NUM_OF_CLASSES)
-        crf_crossMats.append(crf_cm)
-
     print(">>> Prediction results:")
     total_cm = np.sum(crossMats, axis=0)
     EvalMetrics.show_result(total_cm, NUM_OF_CLASSES)
-
-    print("\n")
-    print(">>> Prediction results (CRF):")
-    crf_total_cm = np.sum(crf_crossMats, axis=0)
-    EvalMetrics.show_result(crf_total_cm, NUM_OF_CLASSES)
 
 
 def mode_train(sess, FLAGS, net, train_dataset_reader, validation_dataset_reader, train_records, pred_annotation, image, annotation, keep_probability, logits, train_op, loss, summary_op, summary_writer, saver, display_step=300):
