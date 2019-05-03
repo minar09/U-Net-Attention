@@ -253,7 +253,6 @@ def main(argv=None):
     shared_input.append(image)
     shared_input.append(image075)
     shared_input.append(image050)
-    shared_image = tf.concat(shared_input, axis=3)
 
     annotation075 = tf.cast(tf.image.resize_images(
         annotation, [int(IMAGE_SIZE * 0.75), int(IMAGE_SIZE * 0.75)]), tf.int32)
@@ -266,7 +265,6 @@ def main(argv=None):
     shared_anno.append(annotation)
     shared_anno.append(annotation075)
     shared_anno.append(annotation050)
-    shared_annotation = tf.concat(shared_anno, axis=3)
 
     # 2. construct inference network
     pred_annotation, logits, net, att = unetinference(image, keep_probability, is_training=is_training)
