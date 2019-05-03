@@ -180,7 +180,8 @@ def unetinference(image, keep_prob=0.5, is_training=False):
                 1, 1], activation=None)
         annotation_pred = tf.argmax(outputs, dimension=3, name="prediction")
 
-        return tf.expand_dims(annotation_pred, dim=3), outputs, net, conv5_2
+        # return tf.expand_dims(annotation_pred, dim=3), outputs, net, conv5_2
+        return tf.expand_dims(annotation_pred, dim=3), outputs, net, conv_up4_2
         # return Model(inputs, outputs, teacher, is_training)
 
 
