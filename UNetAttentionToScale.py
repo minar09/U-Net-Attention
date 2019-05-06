@@ -180,9 +180,7 @@ def unetinference(image, keep_prob=0.5, is_training=False):
                 1, 1], activation=None)
         annotation_pred = tf.argmax(outputs, dimension=3, name="prediction")
 
-        return tf.expand_dims(annotation_pred, dim=3), outputs, net, conv5_2
-        # return tf.expand_dims(annotation_pred, dim=3), outputs, net, conv_up4_2
-        # return Model(inputs, outputs, teacher, is_training)
+        return tf.expand_dims(annotation_pred, dim=3), outputs, net
 
 
 """
@@ -259,7 +257,7 @@ def main(argv=None):
 
     # 2. construct inference network
     reuse1 = False
-    reuse2 = True  # For sharing weights among the latter scales
+    reuse2 = True
 
     with tf.variable_scope('', reuse=reuse1):
         pred_annotation100, logits100, net100, att100 = unetinference(image, keep_probability, is_training=is_training)
@@ -285,9 +283,8 @@ def main(argv=None):
         attn_input.append(tf.image.resize_images(att075, tf.shape(att100)[1:3, ]))
         attn_input.append(tf.image.resize_images(att050, tf.shape(att100)[1:3, ]))
         attn_input_train = tf.concat(attn_input, axis=3)
-        scale_att_mask = attention(attn_input_train, is_training)
-        # attn_output_train = attention(attn_input_train, is_training)
-        # scale_att_mask = tf.nn.softmax(attn_output_train)
+        attn_output_train = attention(attn_input_train, is_training)
+        scale_att_mask = tf.nn.softmax(attn_output_train)
 
         score_att_x = tf.multiply(logits100, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3), tf.shape(logits100)[1:3, ]))
         score_att_x_075 = tf.multiply(tf.image.resize_images(logits075, tf.shape(logits100)[1:3, ]), tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 1], axis=3), tf.shape(logits100)[1:3, ]))
@@ -358,9 +355,7 @@ def main(argv=None):
         attn_input.append(tf.image.resize_images(att125, tf.shape(att100)[1:3, ]))
         attn_input_test = tf.concat(attn_input, axis=3)
         attn_output_test = attention(attn_input_test, is_training)
-        # attn_output_test = attention(attn_input_test, is_training)
-        # scale_att_mask = tf.nn.softmax(attn_output_test)
-        scale_att_mask = attn_output_test
+        scale_att_mask = tf.nn.softmax(attn_output_test)
 
         score_att_x = tf.multiply(logits100, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3),
                                                                     tf.shape(logits100)[1:3, ]))
@@ -380,7 +375,6 @@ def main(argv=None):
                                                         tf.image.resize_images(pred_annotation125,
                                                                                tf.shape(pred_annotation100)[1:3, ])]),
                                               axis=0)
-        # final_annotation_pred_test = tf.nn.softmax(final_annotation_pred_test)
 
     tf.summary.image("input_image", image, max_outputs=3)
     tf.summary.image(
