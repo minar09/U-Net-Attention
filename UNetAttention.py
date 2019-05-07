@@ -105,12 +105,12 @@ def unetinference(image, keep_prob=0.5, is_training=False):
             inputs,
             filters=64,
             l2_reg_scale=l2_reg,
-            batchnorm_istraining=is_training)
+            is_training=is_training)
         conv1_2 = Utils.conv(
             conv1_1,
             filters=64,
             l2_reg_scale=l2_reg,
-            batchnorm_istraining=is_training)
+            is_training=is_training)
         pool1 = Utils.pool(conv1_2)
 
         # 1/2, 1/2, 64
@@ -118,12 +118,12 @@ def unetinference(image, keep_prob=0.5, is_training=False):
             pool1,
             filters=128,
             l2_reg_scale=l2_reg,
-            batchnorm_istraining=is_training)
+            is_training=is_training)
         conv2_2 = Utils.conv(
             conv2_1,
             filters=128,
             l2_reg_scale=l2_reg,
-            batchnorm_istraining=is_training)
+            is_training=is_training)
         pool2 = Utils.pool(conv2_2)
 
         # 1/4, 1/4, 128
@@ -131,12 +131,12 @@ def unetinference(image, keep_prob=0.5, is_training=False):
             pool2,
             filters=256,
             l2_reg_scale=l2_reg,
-            batchnorm_istraining=is_training)
+            is_training=is_training)
         conv3_2 = Utils.conv(
             conv3_1,
             filters=256,
             l2_reg_scale=l2_reg,
-            batchnorm_istraining=is_training)
+            is_training=is_training)
         pool3 = Utils.pool(conv3_2)
 
         # 1/8, 1/8, 256
@@ -144,12 +144,12 @@ def unetinference(image, keep_prob=0.5, is_training=False):
             pool3,
             filters=512,
             l2_reg_scale=l2_reg,
-            batchnorm_istraining=is_training)
+            is_training=is_training)
         conv4_2 = Utils.conv(
             conv4_1,
             filters=512,
             l2_reg_scale=l2_reg,
-            batchnorm_istraining=is_training)
+            is_training=is_training)
         pool4 = Utils.pool(conv4_2)
 
         # 1/16, 1/16, 512
@@ -271,9 +271,7 @@ def main(argv=None):
         pred_annotation125, logits125, net125, att125 = unetinference(image125, keep_probability, is_training=is_training)
 
     # apply attention model - train
-    score_final_train = None
     score_final_test = None
-    final_annotation_pred_train = None
     final_annotation_pred_test = None
 
     train_op = None
@@ -285,9 +283,11 @@ def main(argv=None):
         attn_input.append(tf.image.resize_images(att075, tf.shape(att100)[1:3, ]))
         attn_input.append(tf.image.resize_images(att050, tf.shape(att100)[1:3, ]))
         attn_input_train = tf.concat(attn_input, axis=3)
-        scale_att_mask = attention(attn_input_train, is_training)
+        attn_output_train = attention(attn_input_train, is_training)
         # attn_output_train = attention(attn_input_train, is_training)
-        # scale_att_mask = tf.nn.softmax(attn_output_train)
+        # scale_att_mask = tf.nn.softmax(attn_output_train)    # Add axis?
+        # scale_att_mask = tf.argmax(attn_output_train)    # Add axis?
+        scale_att_mask = attn_output_train
 
         score_att_x = tf.multiply(logits100, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3), tf.shape(logits100)[1:3, ]))
         score_att_x_075 = tf.multiply(tf.image.resize_images(logits075, tf.shape(logits100)[1:3, ]), tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 1], axis=3), tf.shape(logits100)[1:3, ]))
@@ -358,8 +358,8 @@ def main(argv=None):
         attn_input.append(tf.image.resize_images(att125, tf.shape(att100)[1:3, ]))
         attn_input_test = tf.concat(attn_input, axis=3)
         attn_output_test = attention(attn_input_test, is_training)
-        # attn_output_test = attention(attn_input_test, is_training)
-        # scale_att_mask = tf.nn.softmax(attn_output_test)
+        # scale_att_mask = tf.nn.softmax(attn_output_test)    # Add axis?
+        # scale_att_mask = tf.argmax(attn_output_test)    # Add axis?
         scale_att_mask = attn_output_test
 
         score_att_x = tf.multiply(logits100, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3),
@@ -460,10 +460,9 @@ def main(argv=None):
     # 6. train-mode
     if FLAGS.mode == "train":
 
-        fd.mode_train(sess, FLAGS, net100, train_dataset_reader, validation_dataset_reader, train_records,
-                      final_annotation_pred_train,
-                      image, annotation, keep_probability, score_final_train, train_op, reduced_loss, summary_op, summary_writer,
-                      saver, DISPLAY_STEP)
+        fd.mode_train(sess, FLAGS, net100, train_dataset_reader, validation_dataset_reader,
+                      image, annotation, keep_probability, train_op, reduced_loss, summary_op, summary_writer,
+                      saver)
 
     # test-random-validation-data mode
     elif FLAGS.mode == "visualize":
@@ -474,26 +473,8 @@ def main(argv=None):
     # test-full-validation-dataset mode
     elif FLAGS.mode == "test":
 
-        fd.mode_new_test(sess, FLAGS, TEST_DIR, test_dataset_reader, test_records,
-                         final_annotation_pred_test, image, annotation, keep_probability, score_final_test, NUM_OF_CLASSES)
-
-        # fd.mode_test(sess, FLAGS, TEST_DIR, test_dataset_reader, test_records,
-        # pred_annotation, image, annotation, keep_probability, logits, NUM_OF_CLASSES)
-
-    elif FLAGS.mode == "crftest":
-
-        fd.mode_predonly(sess, FLAGS, TEST_DIR, test_dataset_reader, test_records,
-                         final_annotation_pred_test, image, annotation, keep_probability, score_final_test, NUM_OF_CLASSES)
-
-    elif FLAGS.mode == "predonly":
-
-        fd.mode_predonly(sess, FLAGS, TEST_DIR, test_dataset_reader, test_records,
-                         final_annotation_pred_test, image, annotation, keep_probability, score_final_test, NUM_OF_CLASSES)
-
-    elif FLAGS.mode == "fulltest":
-
-        fd.mode_full_test(sess, FLAGS, TEST_DIR, test_dataset_reader, test_records,
-                          final_annotation_pred_test, image, annotation, keep_probability, score_final_test, NUM_OF_CLASSES)
+        fd.mode_test(sess, FLAGS, TEST_DIR, test_dataset_reader, test_records,
+                     final_annotation_pred_test, image, annotation, keep_probability, score_final_test, NUM_OF_CLASSES)
 
     sess.close()
 

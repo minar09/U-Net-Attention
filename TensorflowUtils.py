@@ -551,7 +551,7 @@ def conv(
             3],
         activation=tf.nn.relu,
         l2_reg_scale=None,
-        batchnorm_istraining=None):
+        is_training=False):
     if l2_reg_scale is None:
         regularizer = None
     else:
@@ -564,8 +564,8 @@ def conv(
         activation=activation,
         kernel_regularizer=regularizer
     )
-    if batchnorm_istraining is not None:
-        conved = bn(conved, batchnorm_istraining)
+    if is_training:
+        conved = bn(conved, is_training)
 
     return conved
 

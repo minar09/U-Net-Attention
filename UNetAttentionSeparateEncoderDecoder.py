@@ -88,13 +88,13 @@ VIS_DIR = FLAGS.logs_dir + "VisImage/"
 """
 
 
-def unetinference(image, keep_prob=0.5, is_training=False):
+def unet_encoder(image, is_training=False):
     net = {}
     l2_reg = FLAGS.learning_rate
     # added for resume better
     global_iter_counter = tf.Variable(0, name='global_step', trainable=False)
     net['global_step'] = global_iter_counter
-    with tf.variable_scope("inference"):
+    with tf.variable_scope("inference_encoder"):
         inputs = image
         teacher = tf.placeholder(
             tf.float32, [
@@ -105,12 +105,12 @@ def unetinference(image, keep_prob=0.5, is_training=False):
             inputs,
             filters=64,
             l2_reg_scale=l2_reg,
-            batchnorm_istraining=is_training)
+            is_training=is_training)
         conv1_2 = Utils.conv(
             conv1_1,
             filters=64,
             l2_reg_scale=l2_reg,
-            batchnorm_istraining=is_training)
+            is_training=is_training)
         pool1 = Utils.pool(conv1_2)
 
         # 1/2, 1/2, 64
@@ -118,12 +118,12 @@ def unetinference(image, keep_prob=0.5, is_training=False):
             pool1,
             filters=128,
             l2_reg_scale=l2_reg,
-            batchnorm_istraining=is_training)
+            is_training=is_training)
         conv2_2 = Utils.conv(
             conv2_1,
             filters=128,
             l2_reg_scale=l2_reg,
-            batchnorm_istraining=is_training)
+            is_training=is_training)
         pool2 = Utils.pool(conv2_2)
 
         # 1/4, 1/4, 128
@@ -131,12 +131,12 @@ def unetinference(image, keep_prob=0.5, is_training=False):
             pool2,
             filters=256,
             l2_reg_scale=l2_reg,
-            batchnorm_istraining=is_training)
+            is_training=is_training)
         conv3_2 = Utils.conv(
             conv3_1,
             filters=256,
             l2_reg_scale=l2_reg,
-            batchnorm_istraining=is_training)
+            is_training=is_training)
         pool3 = Utils.pool(conv3_2)
 
         # 1/8, 1/8, 256
@@ -144,17 +144,28 @@ def unetinference(image, keep_prob=0.5, is_training=False):
             pool3,
             filters=512,
             l2_reg_scale=l2_reg,
-            batchnorm_istraining=is_training)
+            is_training=is_training)
         conv4_2 = Utils.conv(
             conv4_1,
             filters=512,
             l2_reg_scale=l2_reg,
-            batchnorm_istraining=is_training)
+            is_training=is_training)
         pool4 = Utils.pool(conv4_2)
 
         # 1/16, 1/16, 512
         conv5_1 = Utils.conv(pool4, filters=1024, l2_reg_scale=l2_reg)
         conv5_2 = Utils.conv(conv5_1, filters=1024, l2_reg_scale=l2_reg)
+
+        return conv5_2, conv4_2, conv3_2, conv2_2, conv1_2, net, conv5_1
+
+
+def unet_decoder(image, conv5_2, conv4_2, conv3_2, conv2_2, conv1_2, is_training=False):
+    l2_reg = FLAGS.learning_rate
+
+    with tf.variable_scope("inference_decoder"):
+        inputs = image
+
+        # 1/16, 1/16, 512
         concated1 = tf.concat([Utils.conv_transpose(
             conv5_2, filters=512, l2_reg_scale=l2_reg), conv4_2], axis=3)
 
@@ -180,7 +191,9 @@ def unetinference(image, keep_prob=0.5, is_training=False):
                 1, 1], activation=None)
         annotation_pred = tf.argmax(outputs, dimension=3, name="prediction")
 
-        return tf.expand_dims(annotation_pred, dim=3), outputs, net
+        return tf.expand_dims(annotation_pred, dim=3), outputs
+        # return tf.expand_dims(annotation_pred, dim=3), outputs, net, conv_up4_2
+        # return Model(inputs, outputs, teacher, is_training)
 
 
 """
@@ -257,21 +270,19 @@ def main(argv=None):
 
     # 2. construct inference network
     reuse1 = False
-    reuse2 = True
+    reuse2 = True  # For sharing weights among the latter scales
 
     with tf.variable_scope('', reuse=reuse1):
-        pred_annotation100, logits100, net100, att100 = unetinference(image, keep_probability, is_training=is_training)
+        conv5_2_100, conv4_2_100, conv3_2_100, conv2_2_100, conv1_2_100, net100, attn_input_100 = unet_encoder(image, is_training=is_training)
     with tf.variable_scope('', reuse=reuse2):
-        pred_annotation075, logits075, net075, att075 = unetinference(image075, keep_probability, is_training=is_training)
+        conv5_2_075, conv4_2_075, conv3_2_075, conv2_2_075, conv1_2_075, net075, attn_input_075 = unet_encoder(image075, is_training=is_training)
     with tf.variable_scope('', reuse=reuse2):
-        pred_annotation050, logits050, net050, att050 = unetinference(image050, keep_probability, is_training=is_training)
+        conv5_2_050, conv4_2_050, conv3_2_050, conv2_2_050, conv1_2_050, net050, attn_input_050 = unet_encoder(image050, is_training=is_training)
     with tf.variable_scope('', reuse=reuse2):
-        pred_annotation125, logits125, net125, att125 = unetinference(image125, keep_probability, is_training=is_training)
+        conv5_2_125, conv4_2_125, conv3_2_125, conv2_2_125, conv1_2_125, net125, attn_input_125 = unet_encoder(image125, is_training=is_training)
 
     # apply attention model - train
-    score_final_train = None
     score_final_test = None
-    final_annotation_pred_train = None
     final_annotation_pred_test = None
 
     train_op = None
@@ -284,7 +295,10 @@ def main(argv=None):
         attn_input.append(tf.image.resize_images(att050, tf.shape(att100)[1:3, ]))
         attn_input_train = tf.concat(attn_input, axis=3)
         attn_output_train = attention(attn_input_train, is_training)
-        scale_att_mask = tf.nn.softmax(attn_output_train)
+        # attn_output_train = attention(attn_input_train, is_training)
+        # scale_att_mask = tf.nn.softmax(attn_output_train)    # Add axis?
+        # scale_att_mask = tf.argmax(attn_output_train)    # Add axis?
+        scale_att_mask = attn_output_train
 
         score_att_x = tf.multiply(logits100, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3), tf.shape(logits100)[1:3, ]))
         score_att_x_075 = tf.multiply(tf.image.resize_images(logits075, tf.shape(logits100)[1:3, ]), tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 1], axis=3), tf.shape(logits100)[1:3, ]))
@@ -355,7 +369,9 @@ def main(argv=None):
         attn_input.append(tf.image.resize_images(att125, tf.shape(att100)[1:3, ]))
         attn_input_test = tf.concat(attn_input, axis=3)
         attn_output_test = attention(attn_input_test, is_training)
-        scale_att_mask = tf.nn.softmax(attn_output_test)
+        # scale_att_mask = tf.nn.softmax(attn_output_test)    # Add axis?
+        # scale_att_mask = tf.argmax(attn_output_test)    # Add axis?
+        scale_att_mask = attn_output_test
 
         score_att_x = tf.multiply(logits100, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3),
                                                                     tf.shape(logits100)[1:3, ]))
@@ -375,6 +391,7 @@ def main(argv=None):
                                                         tf.image.resize_images(pred_annotation125,
                                                                                tf.shape(pred_annotation100)[1:3, ])]),
                                               axis=0)
+        # final_annotation_pred_test = tf.nn.softmax(final_annotation_pred_test)
 
     tf.summary.image("input_image", image, max_outputs=3)
     tf.summary.image(
@@ -454,10 +471,9 @@ def main(argv=None):
     # 6. train-mode
     if FLAGS.mode == "train":
 
-        fd.mode_train(sess, FLAGS, net100, train_dataset_reader, validation_dataset_reader, train_records,
-                      final_annotation_pred_train,
-                      image, annotation, keep_probability, score_final_train, train_op, reduced_loss, summary_op, summary_writer,
-                      saver, DISPLAY_STEP)
+        fd.mode_train(sess, FLAGS, net100, train_dataset_reader, validation_dataset_reader,
+                      image, annotation, keep_probability, train_op, reduced_loss, summary_op, summary_writer,
+                      saver)
 
     # test-random-validation-data mode
     elif FLAGS.mode == "visualize":
@@ -468,26 +484,8 @@ def main(argv=None):
     # test-full-validation-dataset mode
     elif FLAGS.mode == "test":
 
-        fd.mode_new_test(sess, FLAGS, TEST_DIR, test_dataset_reader, test_records,
-                         final_annotation_pred_test, image, annotation, keep_probability, score_final_test, NUM_OF_CLASSES)
-
-        # fd.mode_test(sess, FLAGS, TEST_DIR, test_dataset_reader, test_records,
-        # pred_annotation, image, annotation, keep_probability, logits, NUM_OF_CLASSES)
-
-    elif FLAGS.mode == "crftest":
-
-        fd.mode_predonly(sess, FLAGS, TEST_DIR, test_dataset_reader, test_records,
-                         final_annotation_pred_test, image, annotation, keep_probability, score_final_test, NUM_OF_CLASSES)
-
-    elif FLAGS.mode == "predonly":
-
-        fd.mode_predonly(sess, FLAGS, TEST_DIR, test_dataset_reader, test_records,
-                         final_annotation_pred_test, image, annotation, keep_probability, score_final_test, NUM_OF_CLASSES)
-
-    elif FLAGS.mode == "fulltest":
-
-        fd.mode_full_test(sess, FLAGS, TEST_DIR, test_dataset_reader, test_records,
-                          final_annotation_pred_test, image, annotation, keep_probability, score_final_test, NUM_OF_CLASSES)
+        fd.mode_test(sess, FLAGS, TEST_DIR, test_dataset_reader, test_records,
+                     final_annotation_pred_test, image, annotation, keep_probability, score_final_test, NUM_OF_CLASSES)
 
     sess.close()
 
