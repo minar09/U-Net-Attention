@@ -293,8 +293,8 @@ def main(argv=None):
         scale_att_mask = attn_output_train
 
         score_att_x_100 = tf.multiply(conv5_2_100, tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3))
-        score_att_x_075 = tf.multiply(conv5_2_075, tf.expand_dims(scale_att_mask[:, :, :, 1], axis=3))
-        score_att_x_050 = tf.multiply(conv5_2_050, tf.expand_dims(scale_att_mask[:, :, :, 2], axis=3))
+        score_att_x_075 = tf.multiply(conv5_2_075, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 1], axis=3), tf.shape(conv5_2_075)[1:3, ]))
+        score_att_x_050 = tf.multiply(conv5_2_050, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 2], axis=3), tf.shape(conv5_2_050)[1:3, ]))
 
     else:
         # apply attention model - test
