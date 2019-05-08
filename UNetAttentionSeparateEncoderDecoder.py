@@ -159,11 +159,10 @@ def unet_encoder(image, is_training=False):
         return conv5_2, conv4_2, conv3_2, conv2_2, conv1_2, net, conv5_1
 
 
-def unet_decoder(image, conv5_2, conv4_2, conv3_2, conv2_2, conv1_2, is_training=False):
+def unet_decoder(conv5_2, conv4_2, conv3_2, conv2_2, conv1_2, is_training=False):
     l2_reg = FLAGS.learning_rate
 
     with tf.variable_scope("inference_decoder"):
-        inputs = image
 
         # 1/16, 1/16, 512
         concated1 = tf.concat([Utils.conv_transpose(
@@ -186,12 +185,12 @@ def unet_decoder(image, conv5_2, conv4_2, conv3_2, conv2_2, conv1_2, is_training
 
         conv_up4_1 = Utils.conv(concated4, filters=64, l2_reg_scale=l2_reg)
         conv_up4_2 = Utils.conv(conv_up4_1, filters=64, l2_reg_scale=l2_reg)
-        outputs = Utils.conv(
+        logits = Utils.conv(
             conv_up4_2, filters=NUM_OF_CLASSES, kernel_size=[
                 1, 1], activation=None)
-        annotation_pred = tf.argmax(outputs, dimension=3, name="prediction")
+        annotation_pred = tf.argmax(logits, dimension=3, name="prediction")
 
-        return tf.expand_dims(annotation_pred, dim=3), outputs
+        return tf.expand_dims(annotation_pred, dim=3), logits
         # return tf.expand_dims(annotation_pred, dim=3), outputs, net, conv_up4_2
         # return Model(inputs, outputs, teacher, is_training)
 
@@ -273,13 +272,13 @@ def main(argv=None):
     reuse2 = True  # For sharing weights among the latter scales
 
     with tf.variable_scope('', reuse=reuse1):
-        conv5_2_100, conv4_2_100, conv3_2_100, conv2_2_100, conv1_2_100, net100, attn_input_100 = unet_encoder(image, is_training=is_training)
+        conv5_2_100, conv4_2_100, conv3_2_100, conv2_2_100, conv1_2_100, net100, att100 = unet_encoder(image, is_training=is_training)
     with tf.variable_scope('', reuse=reuse2):
-        conv5_2_075, conv4_2_075, conv3_2_075, conv2_2_075, conv1_2_075, net075, attn_input_075 = unet_encoder(image075, is_training=is_training)
+        conv5_2_075, conv4_2_075, conv3_2_075, conv2_2_075, conv1_2_075, net075, att075 = unet_encoder(image075, is_training=is_training)
     with tf.variable_scope('', reuse=reuse2):
-        conv5_2_050, conv4_2_050, conv3_2_050, conv2_2_050, conv1_2_050, net050, attn_input_050 = unet_encoder(image050, is_training=is_training)
+        conv5_2_050, conv4_2_050, conv3_2_050, conv2_2_050, conv1_2_050, net050, att050 = unet_encoder(image050, is_training=is_training)
     with tf.variable_scope('', reuse=reuse2):
-        conv5_2_125, conv4_2_125, conv3_2_125, conv2_2_125, conv1_2_125, net125, attn_input_125 = unet_encoder(image125, is_training=is_training)
+        conv5_2_125, conv4_2_125, conv3_2_125, conv2_2_125, conv1_2_125, net125, att125 = unet_encoder(image125, is_training=is_training)
 
     # apply attention model - train
     score_final_test = None
@@ -295,71 +294,12 @@ def main(argv=None):
         attn_input.append(tf.image.resize_images(att050, tf.shape(att100)[1:3, ]))
         attn_input_train = tf.concat(attn_input, axis=3)
         attn_output_train = attention(attn_input_train, is_training)
-        # attn_output_train = attention(attn_input_train, is_training)
-        # scale_att_mask = tf.nn.softmax(attn_output_train)    # Add axis?
-        # scale_att_mask = tf.argmax(attn_output_train)    # Add axis?
+        attn_output_train = tf.nn.softmax(attn_output_train)    # Add axis?
         scale_att_mask = attn_output_train
 
-        score_att_x = tf.multiply(logits100, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3), tf.shape(logits100)[1:3, ]))
-        score_att_x_075 = tf.multiply(tf.image.resize_images(logits075, tf.shape(logits100)[1:3, ]), tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 1], axis=3), tf.shape(logits100)[1:3, ]))
-        score_att_x_050 = tf.multiply(tf.image.resize_images(logits050, tf.shape(logits100)[1:3, ]), tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 2], axis=3), tf.shape(logits100)[1:3, ]))
-        score_final_train = score_att_x + score_att_x_075 + score_att_x_050
-
-        final_annotation_pred = tf.expand_dims(tf.argmax(score_final_train, dimension=3, name="final_prediction"), dim=3)
-        final_annotation_pred_train = tf.reduce_mean(
-            tf.stack([tf.cast(final_annotation_pred, tf.float32), tf.cast(pred_annotation100, tf.float32),
-                      tf.image.resize_images(pred_annotation075,
-                                             tf.shape(pred_annotation100)[1:3, ]),
-                      tf.image.resize_images(pred_annotation050,
-                                             tf.shape(pred_annotation100)[1:3, ])]),
-            axis=0)
-
-        # 3. loss measure
-        loss = tf.reduce_mean(
-            (tf.nn.sparse_softmax_cross_entropy_with_logits(
-                logits=score_final_train,
-                labels=tf.squeeze(
-                    annotation,
-                    squeeze_dims=[3]),
-                name="entropy")))
-        tf.summary.scalar("entropy", loss)
-
-        loss100 = tf.reduce_mean(
-            (tf.nn.sparse_softmax_cross_entropy_with_logits(
-                logits=logits100,
-                labels=tf.squeeze(
-                    annotation,
-                    squeeze_dims=[3]),
-                name="entropy")))
-        tf.summary.scalar("entropy", loss100)
-
-        loss075 = tf.reduce_mean(
-            (tf.nn.sparse_softmax_cross_entropy_with_logits(
-                logits=logits075,
-                labels=tf.squeeze(
-                    annotation075,
-                    squeeze_dims=[3]),
-                name="entropy")))
-        tf.summary.scalar("entropy", loss075)
-
-        loss050 = tf.reduce_mean(
-            (tf.nn.sparse_softmax_cross_entropy_with_logits(
-                logits=logits050,
-                labels=tf.squeeze(
-                    annotation050,
-                    squeeze_dims=[3]),
-                name="entropy")))
-        tf.summary.scalar("entropy", loss050)
-
-        reduced_loss = loss + loss100 + loss075 + loss050
-
-        # 4. optimizing
-        trainable_var = tf.trainable_variables()
-        if FLAGS.debug:
-            for var in trainable_var:
-                Utils.add_to_regularization_and_summary(var)
-
-        train_op = train(reduced_loss, trainable_var, net100['global_step'])
+        score_att_x = tf.multiply(conv5_2_100, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3), tf.shape(conv5_2_100)[1:3, ]))
+        score_att_x_075 = tf.multiply(tf.image.resize_images(conv5_2_075, tf.shape(conv5_2_100)[1:3, ]), tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 1], axis=3), tf.shape(conv5_2_100)[1:3, ]))
+        score_att_x_050 = tf.multiply(tf.image.resize_images(conv5_2_050, tf.shape(conv5_2_100)[1:3, ]), tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 2], axis=3), tf.shape(conv5_2_100)[1:3, ]))
 
     else:
         # apply attention model - test
@@ -369,29 +309,105 @@ def main(argv=None):
         attn_input.append(tf.image.resize_images(att125, tf.shape(att100)[1:3, ]))
         attn_input_test = tf.concat(attn_input, axis=3)
         attn_output_test = attention(attn_input_test, is_training)
-        # scale_att_mask = tf.nn.softmax(attn_output_test)    # Add axis?
-        # scale_att_mask = tf.argmax(attn_output_test)    # Add axis?
+        attn_output_test = tf.nn.softmax(attn_output_test)    # Add axis?
         scale_att_mask = attn_output_test
 
-        score_att_x = tf.multiply(logits100, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3),
-                                                                    tf.shape(logits100)[1:3, ]))
-        score_att_x_075 = tf.multiply(tf.image.resize_images(logits075, tf.shape(logits100)[1:3, ]),
+        score_att_x = tf.multiply(conv5_2_100, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3),
+                                                                    tf.shape(conv5_2_100)[1:3, ]))
+        score_att_x_075 = tf.multiply(tf.image.resize_images(conv5_2_075, tf.shape(conv5_2_100)[1:3, ]),
                                       tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 1], axis=3),
-                                                             tf.shape(logits100)[1:3, ]))
-        score_att_x_125 = tf.multiply(tf.image.resize_images(logits125, tf.shape(logits100)[1:3, ]),
+                                                             tf.shape(conv5_2_100)[1:3, ]))
+        score_att_x_125 = tf.multiply(tf.image.resize_images(conv5_2_125, tf.shape(conv5_2_100)[1:3, ]),
                                       tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 2], axis=3),
-                                                             tf.shape(logits100)[1:3, ]))
+                                                             tf.shape(conv5_2_100)[1:3, ]))
 
-        score_final_test = score_att_x + score_att_x_075 + score_att_x_125
+    with tf.variable_scope('', reuse=reuse1):
+        pred_annotation100, logits100 = unet_decoder(score_att_x, conv4_2_100, conv3_2_100, conv2_2_100, conv1_2_100,
+                                                     is_training)
+    with tf.variable_scope('', reuse=reuse2):
+        pred_annotation075, logits075 = unet_decoder(score_att_x, conv4_2_075, conv3_2_075, conv2_2_075, conv1_2_075,
+                                                     is_training)
+    with tf.variable_scope('', reuse=reuse2):
+        pred_annotation050, logits050 = unet_decoder(score_att_x, conv4_2_050, conv3_2_050, conv2_2_050, conv1_2_050,
+                                                     is_training)
+    with tf.variable_scope('', reuse=reuse2):
+        pred_annotation125, logits125 = unet_decoder(score_att_x, conv4_2_125, conv3_2_125, conv2_2_125, conv1_2_125,
+                                                     is_training)
 
-        final_annotation_pred = tf.expand_dims(tf.argmax(score_final_test, dimension=3, name="final_prediction"), dim=3)
-        final_annotation_pred_test = tf.reduce_mean(tf.stack([tf.cast(final_annotation_pred, tf.float32), tf.cast(pred_annotation100, tf.float32),
-                                                        tf.image.resize_images(pred_annotation075,
-                                                                               tf.shape(pred_annotation100)[1:3, ]),
-                                                        tf.image.resize_images(pred_annotation125,
-                                                                               tf.shape(pred_annotation100)[1:3, ])]),
-                                              axis=0)
-        # final_annotation_pred_test = tf.nn.softmax(final_annotation_pred_test)
+    logits_train = tf.reduce_mean(tf.stack([logits100,
+                                            tf.image.resize_images(logits075,
+                                                                   tf.shape(logits100)[1:3, ]),
+                                            tf.image.resize_images(logits050,
+                                                                   tf.shape(logits100)[1:3, ])]),
+                                  axis=0)
+
+    pred_annotation_train = tf.reduce_mean(tf.stack([tf.cast(pred_annotation100, tf.float32),
+                                                     tf.image.resize_images(pred_annotation075,
+                                                                            tf.shape(pred_annotation100)[1:3, ]),
+                                                     tf.image.resize_images(pred_annotation050,
+                                                                            tf.shape(pred_annotation100)[1:3, ])]),
+                                           axis=0)
+
+    pred_annotation_test = tf.reduce_mean(tf.stack([tf.cast(pred_annotation100, tf.float32),
+                                                    tf.image.resize_images(pred_annotation075,
+                                                                           tf.shape(pred_annotation100)[1:3, ]),
+                                                    tf.image.resize_images(pred_annotation125,
+                                                                           tf.shape(pred_annotation100)[1:3, ])]),
+                                          axis=0)
+
+    logits_test = tf.reduce_mean(tf.stack([logits100,
+                                           tf.image.resize_images(logits075,
+                                                                  tf.shape(logits100)[1:3, ]),
+                                           tf.image.resize_images(logits125,
+                                                                  tf.shape(logits100)[1:3, ])]),
+                                 axis=0)
+
+    # 3. loss measure
+    loss = tf.reduce_mean(
+        (tf.nn.sparse_softmax_cross_entropy_with_logits(
+            logits=logits_train,
+            labels=tf.squeeze(
+                annotation,
+                squeeze_dims=[3]),
+            name="entropy")))
+    tf.summary.scalar("entropy", loss)
+
+    loss100 = tf.reduce_mean(
+        (tf.nn.sparse_softmax_cross_entropy_with_logits(
+            logits=logits100,
+            labels=tf.squeeze(
+                annotation,
+                squeeze_dims=[3]),
+            name="entropy")))
+    tf.summary.scalar("entropy", loss100)
+
+    loss075 = tf.reduce_mean(
+        (tf.nn.sparse_softmax_cross_entropy_with_logits(
+            logits=logits075,
+            labels=tf.squeeze(
+                annotation075,
+                squeeze_dims=[3]),
+            name="entropy")))
+    tf.summary.scalar("entropy", loss075)
+
+    loss050 = tf.reduce_mean(
+        (tf.nn.sparse_softmax_cross_entropy_with_logits(
+            logits=logits050,
+            labels=tf.squeeze(
+                annotation050,
+                squeeze_dims=[3]),
+            name="entropy")))
+    tf.summary.scalar("entropy", loss050)
+
+    reduced_loss = loss + loss100 + loss075 + loss050
+
+    # 4. optimizing
+    trainable_var = tf.trainable_variables()
+    if FLAGS.debug:
+        for var in trainable_var:
+            Utils.add_to_regularization_and_summary(var)
+
+    train_op = train(reduced_loss, trainable_var, net100['global_step'])
 
     tf.summary.image("input_image", image, max_outputs=3)
     tf.summary.image(
@@ -479,13 +495,13 @@ def main(argv=None):
     elif FLAGS.mode == "visualize":
 
         fd.mode_visualize(sess, FLAGS, VIS_DIR, validation_dataset_reader,
-                          final_annotation_pred_test, attn_output_test, pred_annotation100, pred_annotation075, pred_annotation125, image, annotation, keep_probability, NUM_OF_CLASSES)
+                          logits_test, pred_annotation_test, pred_annotation100, pred_annotation075, pred_annotation125, image, annotation, keep_probability, NUM_OF_CLASSES)
 
     # test-full-validation-dataset mode
     elif FLAGS.mode == "test":
 
-        fd.mode_test(sess, FLAGS, TEST_DIR, test_dataset_reader, test_records,
-                     final_annotation_pred_test, image, annotation, keep_probability, score_final_test, NUM_OF_CLASSES)
+        fd.mode_test(sess, FLAGS, TEST_DIR, test_dataset_reader,
+                     pred_annotation_test, image, annotation, keep_probability, logits_test, NUM_OF_CLASSES)
 
     sess.close()
 
