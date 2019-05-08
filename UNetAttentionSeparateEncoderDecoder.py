@@ -282,6 +282,9 @@ def main(argv=None):
         conv5_2_125, conv4_2_125, conv3_2_125, conv2_2_125, conv1_2_125, net125, att125 = unet_encoder(image125, is_training=is_training)
 
     # apply attention
+    score_att_x_050 = None
+    score_att_x_125 = None
+
     if FLAGS.mode == "train":
         attn_input = []
         attn_input.append(att100)
@@ -307,14 +310,13 @@ def main(argv=None):
         attn_output_test = tf.nn.softmax(attn_output_test)    # Add axis?
         scale_att_mask = attn_output_test
 
-        score_att_x_100 = tf.multiply(conv5_2_100, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3),
-                                                                    tf.shape(conv5_2_100)[1:3, ]))
-        score_att_x_075 = tf.multiply(tf.image.resize_images(conv5_2_075, tf.shape(conv5_2_100)[1:3, ]),
+        score_att_x_100 = tf.multiply(conv5_2_100, tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3))
+        score_att_x_075 = tf.multiply(conv5_2_075,
                                       tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 1], axis=3),
-                                                             tf.shape(conv5_2_100)[1:3, ]))
-        score_att_x_125 = tf.multiply(tf.image.resize_images(conv5_2_125, tf.shape(conv5_2_100)[1:3, ]),
+                                                             tf.shape(conv5_2_075)[1:3, ]))
+        score_att_x_125 = tf.multiply(conv5_2_125,
                                       tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 2], axis=3),
-                                                             tf.shape(conv5_2_100)[1:3, ]))
+                                                             tf.shape(conv5_2_125)[1:3, ]))
 
     # apply decoders
     with tf.variable_scope('', reuse=reuse1):
