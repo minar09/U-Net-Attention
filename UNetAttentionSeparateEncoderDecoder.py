@@ -282,9 +282,6 @@ def main(argv=None):
         conv5_2_125, conv4_2_125, conv3_2_125, conv2_2_125, conv1_2_125, net125, att125 = unet_encoder(image125, is_training=is_training)
 
     # apply attention
-    score_att_x_050 = None
-    score_att_x_125 = None
-
     if FLAGS.mode == "train":
         attn_input = []
         attn_input.append(att100)
