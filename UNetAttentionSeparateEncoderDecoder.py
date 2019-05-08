@@ -297,7 +297,7 @@ def main(argv=None):
         attn_output_train = tf.nn.softmax(attn_output_train)    # Add axis?
         scale_att_mask = attn_output_train
 
-        score_att_x = tf.multiply(conv5_2_100, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3), tf.shape(conv5_2_100)[1:3, ]))
+        score_att_x_100 = tf.multiply(conv5_2_100, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3), tf.shape(conv5_2_100)[1:3, ]))
         score_att_x_075 = tf.multiply(tf.image.resize_images(conv5_2_075, tf.shape(conv5_2_100)[1:3, ]), tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 1], axis=3), tf.shape(conv5_2_100)[1:3, ]))
         score_att_x_050 = tf.multiply(tf.image.resize_images(conv5_2_050, tf.shape(conv5_2_100)[1:3, ]), tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 2], axis=3), tf.shape(conv5_2_100)[1:3, ]))
 
@@ -312,7 +312,7 @@ def main(argv=None):
         attn_output_test = tf.nn.softmax(attn_output_test)    # Add axis?
         scale_att_mask = attn_output_test
 
-        score_att_x = tf.multiply(conv5_2_100, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3),
+        score_att_x_100 = tf.multiply(conv5_2_100, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3),
                                                                     tf.shape(conv5_2_100)[1:3, ]))
         score_att_x_075 = tf.multiply(tf.image.resize_images(conv5_2_075, tf.shape(conv5_2_100)[1:3, ]),
                                       tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 1], axis=3),
@@ -322,16 +322,16 @@ def main(argv=None):
                                                              tf.shape(conv5_2_100)[1:3, ]))
 
     with tf.variable_scope('', reuse=reuse1):
-        pred_annotation100, logits100 = unet_decoder(score_att_x, conv4_2_100, conv3_2_100, conv2_2_100, conv1_2_100,
+        pred_annotation100, logits100 = unet_decoder(score_att_x_100, conv4_2_100, conv3_2_100, conv2_2_100, conv1_2_100,
                                                      is_training)
     with tf.variable_scope('', reuse=reuse2):
-        pred_annotation075, logits075 = unet_decoder(score_att_x, conv4_2_075, conv3_2_075, conv2_2_075, conv1_2_075,
+        pred_annotation075, logits075 = unet_decoder(score_att_x_075, conv4_2_075, conv3_2_075, conv2_2_075, conv1_2_075,
                                                      is_training)
     with tf.variable_scope('', reuse=reuse2):
-        pred_annotation050, logits050 = unet_decoder(score_att_x, conv4_2_050, conv3_2_050, conv2_2_050, conv1_2_050,
+        pred_annotation050, logits050 = unet_decoder(score_att_x_050, conv4_2_050, conv3_2_050, conv2_2_050, conv1_2_050,
                                                      is_training)
     with tf.variable_scope('', reuse=reuse2):
-        pred_annotation125, logits125 = unet_decoder(score_att_x, conv4_2_125, conv3_2_125, conv2_2_125, conv1_2_125,
+        pred_annotation125, logits125 = unet_decoder(score_att_x_125, conv4_2_125, conv3_2_125, conv2_2_125, conv1_2_125,
                                                      is_training)
 
     logits_train = tf.reduce_mean(tf.stack([logits100,
