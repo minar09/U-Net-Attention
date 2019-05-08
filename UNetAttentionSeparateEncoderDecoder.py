@@ -271,6 +271,7 @@ def main(argv=None):
     reuse1 = False
     reuse2 = True  # For sharing weights among the latter scales
 
+    # apply encoders
     with tf.variable_scope('', reuse=reuse1):
         conv5_2_100, conv4_2_100, conv3_2_100, conv2_2_100, conv1_2_100, net100, att100 = unet_encoder(image, is_training=is_training)
     with tf.variable_scope('', reuse=reuse2):
@@ -280,13 +281,7 @@ def main(argv=None):
     with tf.variable_scope('', reuse=reuse2):
         conv5_2_125, conv4_2_125, conv3_2_125, conv2_2_125, conv1_2_125, net125, att125 = unet_encoder(image125, is_training=is_training)
 
-    # apply attention model - train
-    score_final_test = None
-    final_annotation_pred_test = None
-
-    train_op = None
-    reduced_loss = None
-
+    # apply attention
     if FLAGS.mode == "train":
         attn_input = []
         attn_input.append(att100)
@@ -297,9 +292,9 @@ def main(argv=None):
         attn_output_train = tf.nn.softmax(attn_output_train)    # Add axis?
         scale_att_mask = attn_output_train
 
-        score_att_x_100 = tf.multiply(conv5_2_100, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3), tf.shape(conv5_2_100)[1:3, ]))
-        score_att_x_075 = tf.multiply(tf.image.resize_images(conv5_2_075, tf.shape(conv5_2_100)[1:3, ]), tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 1], axis=3), tf.shape(conv5_2_100)[1:3, ]))
-        score_att_x_050 = tf.multiply(tf.image.resize_images(conv5_2_050, tf.shape(conv5_2_100)[1:3, ]), tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 2], axis=3), tf.shape(conv5_2_100)[1:3, ]))
+        score_att_x_100 = tf.multiply(conv5_2_100, tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3))
+        score_att_x_075 = tf.multiply(conv5_2_075, tf.expand_dims(scale_att_mask[:, :, :, 1], axis=3))
+        score_att_x_050 = tf.multiply(conv5_2_050, tf.expand_dims(scale_att_mask[:, :, :, 2], axis=3))
 
     else:
         # apply attention model - test
@@ -321,6 +316,7 @@ def main(argv=None):
                                       tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 2], axis=3),
                                                              tf.shape(conv5_2_100)[1:3, ]))
 
+    # apply decoders
     with tf.variable_scope('', reuse=reuse1):
         pred_annotation100, logits100 = unet_decoder(score_att_x_100, conv4_2_100, conv3_2_100, conv2_2_100, conv1_2_100,
                                                      is_training)
