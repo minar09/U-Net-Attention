@@ -64,19 +64,19 @@ lip_label_colours = [(0, 0, 0),  # 0=Background
                      ]
 
 
-def mode_visualize(sess, flags, test_dir, validation_dataset_reader, pred_annotation, attn_output_test, pred_annotation050, pred_annotation075, pred_annotation125, image, annotation, keep_probability, num_classes):
+def mode_visualize(sess, flags, test_dir, validation_dataset_reader, pred_annotation, attn_output_test, pred_annotation100, pred_annotation075, pred_annotation125, image, annotation, keep_probability, num_classes):
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
     valid_images, valid_annotations = validation_dataset_reader.get_random_batch(
         flags.batch_size)
-    pred, weights, pred50, pred75, pred125 = sess.run([pred_annotation, attn_output_test, pred_annotation050, pred_annotation075, pred_annotation125],
-                    feed_dict={image: valid_images, annotation: valid_annotations,
+    pred, weights, pred100, pred75, pred125 = sess.run([pred_annotation, attn_output_test, pred_annotation100, pred_annotation075, pred_annotation125],
+                                                      feed_dict={image: valid_images, annotation: valid_annotations,
                                keep_probability: 1.0})
 
     valid_annotations = np.squeeze(valid_annotations, axis=3)
     pred = np.squeeze(pred, axis=3)
-    pred50 = np.squeeze(pred50, axis=3)
+    pred100 = np.squeeze(pred100, axis=3)
     pred75 = np.squeeze(pred75, axis=3)
     pred125 = np.squeeze(pred125, axis=3)
 
@@ -129,11 +129,11 @@ def mode_visualize(sess, flags, test_dir, validation_dataset_reader, pred_annota
         pos = 240 + 5
         plt.subplot(pos)
         plt.imshow(
-            pred50[itr].astype(
+            pred100[itr].astype(
                 np.uint8),
             cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
         plt.axis('off')
-        plt.title('Prediction50')
+        plt.title('Prediction100')
 
         pos = 240 + 6
         plt.subplot(pos)
@@ -142,7 +142,7 @@ def mode_visualize(sess, flags, test_dir, validation_dataset_reader, pred_annota
                 np.uint8),
             cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
         plt.axis('off')
-        plt.title('Prediction75')
+        plt.title('Prediction075')
 
         pos = 240 + 7
         plt.subplot(pos)
