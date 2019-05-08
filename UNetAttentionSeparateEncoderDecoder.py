@@ -271,6 +271,11 @@ def main(argv=None):
     reuse1 = False
     reuse2 = True  # For sharing weights among the latter scales
 
+    train_op = None
+    reduced_loss = None
+    logits_test = None
+    pred_annotation_test = None
+
     # apply encoders
     with tf.variable_scope('', reuse=reuse1):
         conv5_2_100, conv4_2_100, conv3_2_100, conv2_2_100, conv1_2_100, net100, att100 = unet_encoder(image, is_training=is_training)
@@ -332,80 +337,82 @@ def main(argv=None):
             pred_annotation125, logits125 = unet_decoder(score_att_x_125, conv4_2_125, conv3_2_125, conv2_2_125, conv1_2_125,
                                                          is_training)
 
-    logits_train = tf.reduce_mean(tf.stack([logits100,
-                                            tf.image.resize_images(logits075,
-                                                                   tf.shape(logits100)[1:3, ]),
-                                            tf.image.resize_images(logits050,
-                                                                   tf.shape(logits100)[1:3, ])]),
-                                  axis=0)
+    if FLAGS.mode == "train":
+        logits_train = tf.reduce_mean(tf.stack([logits100,
+                                                tf.image.resize_images(logits075,
+                                                                       tf.shape(logits100)[1:3, ]),
+                                                tf.image.resize_images(logits050,
+                                                                       tf.shape(logits100)[1:3, ])]),
+                                      axis=0)
 
-    pred_annotation_train = tf.reduce_mean(tf.stack([tf.cast(pred_annotation100, tf.float32),
-                                                     tf.image.resize_images(pred_annotation075,
-                                                                            tf.shape(pred_annotation100)[1:3, ]),
-                                                     tf.image.resize_images(pred_annotation050,
-                                                                            tf.shape(pred_annotation100)[1:3, ])]),
-                                           axis=0)
+        pred_annotation_train = tf.reduce_mean(tf.stack([tf.cast(pred_annotation100, tf.float32),
+                                                         tf.image.resize_images(pred_annotation075,
+                                                                                tf.shape(pred_annotation100)[1:3, ]),
+                                                         tf.image.resize_images(pred_annotation050,
+                                                                                tf.shape(pred_annotation100)[1:3, ])]),
+                                               axis=0)
 
-    pred_annotation_test = tf.reduce_mean(tf.stack([tf.cast(pred_annotation100, tf.float32),
-                                                    tf.image.resize_images(pred_annotation075,
-                                                                           tf.shape(pred_annotation100)[1:3, ]),
-                                                    tf.image.resize_images(pred_annotation125,
-                                                                           tf.shape(pred_annotation100)[1:3, ])]),
-                                          axis=0)
+        # 3. loss measure
+        loss = tf.reduce_mean(
+            (tf.nn.sparse_softmax_cross_entropy_with_logits(
+                logits=logits_train,
+                labels=tf.squeeze(
+                    annotation,
+                    squeeze_dims=[3]),
+                name="entropy")))
+        tf.summary.scalar("entropy", loss)
 
-    logits_test = tf.reduce_mean(tf.stack([logits100,
-                                           tf.image.resize_images(logits075,
-                                                                  tf.shape(logits100)[1:3, ]),
-                                           tf.image.resize_images(logits125,
-                                                                  tf.shape(logits100)[1:3, ])]),
-                                 axis=0)
+        loss100 = tf.reduce_mean(
+            (tf.nn.sparse_softmax_cross_entropy_with_logits(
+                logits=logits100,
+                labels=tf.squeeze(
+                    annotation,
+                    squeeze_dims=[3]),
+                name="entropy")))
+        tf.summary.scalar("entropy", loss100)
 
-    # 3. loss measure
-    loss = tf.reduce_mean(
-        (tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits_train,
-            labels=tf.squeeze(
-                annotation,
-                squeeze_dims=[3]),
-            name="entropy")))
-    tf.summary.scalar("entropy", loss)
+        loss075 = tf.reduce_mean(
+            (tf.nn.sparse_softmax_cross_entropy_with_logits(
+                logits=logits075,
+                labels=tf.squeeze(
+                    annotation075,
+                    squeeze_dims=[3]),
+                name="entropy")))
+        tf.summary.scalar("entropy", loss075)
 
-    loss100 = tf.reduce_mean(
-        (tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits100,
-            labels=tf.squeeze(
-                annotation,
-                squeeze_dims=[3]),
-            name="entropy")))
-    tf.summary.scalar("entropy", loss100)
+        loss050 = tf.reduce_mean(
+            (tf.nn.sparse_softmax_cross_entropy_with_logits(
+                logits=logits050,
+                labels=tf.squeeze(
+                    annotation050,
+                    squeeze_dims=[3]),
+                name="entropy")))
+        tf.summary.scalar("entropy", loss050)
 
-    loss075 = tf.reduce_mean(
-        (tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits075,
-            labels=tf.squeeze(
-                annotation075,
-                squeeze_dims=[3]),
-            name="entropy")))
-    tf.summary.scalar("entropy", loss075)
+        reduced_loss = loss + loss100 + loss075 + loss050
 
-    loss050 = tf.reduce_mean(
-        (tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits050,
-            labels=tf.squeeze(
-                annotation050,
-                squeeze_dims=[3]),
-            name="entropy")))
-    tf.summary.scalar("entropy", loss050)
+        # 4. optimizing
+        trainable_var = tf.trainable_variables()
+        if FLAGS.debug:
+            for var in trainable_var:
+                Utils.add_to_regularization_and_summary(var)
 
-    reduced_loss = loss + loss100 + loss075 + loss050
+        train_op = train(reduced_loss, trainable_var, net100['global_step'])
 
-    # 4. optimizing
-    trainable_var = tf.trainable_variables()
-    if FLAGS.debug:
-        for var in trainable_var:
-            Utils.add_to_regularization_and_summary(var)
+    else:
+        pred_annotation_test = tf.reduce_mean(tf.stack([tf.cast(pred_annotation100, tf.float32),
+                                                        tf.image.resize_images(pred_annotation075,
+                                                                               tf.shape(pred_annotation100)[1:3, ]),
+                                                        tf.image.resize_images(pred_annotation125,
+                                                                               tf.shape(pred_annotation100)[1:3, ])]),
+                                              axis=0)
 
-    train_op = train(reduced_loss, trainable_var, net100['global_step'])
+        logits_test = tf.reduce_mean(tf.stack([logits100,
+                                               tf.image.resize_images(logits075,
+                                                                      tf.shape(logits100)[1:3, ]),
+                                               tf.image.resize_images(logits125,
+                                                                      tf.shape(logits100)[1:3, ])]),
+                                     axis=0)
 
     tf.summary.image("input_image", image, max_outputs=3)
     tf.summary.image(
