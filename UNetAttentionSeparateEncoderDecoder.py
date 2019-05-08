@@ -322,12 +322,15 @@ def main(argv=None):
     with tf.variable_scope('', reuse=reuse2):
         pred_annotation075, logits075 = unet_decoder(score_att_x_075, conv4_2_075, conv3_2_075, conv2_2_075, conv1_2_075,
                                                      is_training)
-    with tf.variable_scope('', reuse=reuse2):
-        pred_annotation050, logits050 = unet_decoder(score_att_x_050, conv4_2_050, conv3_2_050, conv2_2_050, conv1_2_050,
-                                                     is_training)
-    with tf.variable_scope('', reuse=reuse2):
-        pred_annotation125, logits125 = unet_decoder(score_att_x_125, conv4_2_125, conv3_2_125, conv2_2_125, conv1_2_125,
-                                                     is_training)
+
+    if FLAGS.mode == "train":
+        with tf.variable_scope('', reuse=reuse2):
+            pred_annotation050, logits050 = unet_decoder(score_att_x_050, conv4_2_050, conv3_2_050, conv2_2_050, conv1_2_050,
+                                                         is_training)
+    else:
+        with tf.variable_scope('', reuse=reuse2):
+            pred_annotation125, logits125 = unet_decoder(score_att_x_125, conv4_2_125, conv3_2_125, conv2_2_125, conv1_2_125,
+                                                         is_training)
 
     logits_train = tf.reduce_mean(tf.stack([logits100,
                                             tf.image.resize_images(logits075,
