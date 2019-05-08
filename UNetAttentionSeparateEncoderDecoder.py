@@ -60,9 +60,9 @@ tf.flags.DEFINE_float(
 tf.flags.DEFINE_string("model_dir", "Model_zoo/", "Path to vgg model mat")
 tf.flags.DEFINE_bool('debug', "False", "Debug mode: True/ False")
 
-# tf.flags.DEFINE_string('mode', "train", "Mode train/ test/ visualize")
+tf.flags.DEFINE_string('mode', "train", "Mode train/ test/ visualize")
 # tf.flags.DEFINE_string('mode', "test", "Mode train/ test/ visualize")
-tf.flags.DEFINE_string('mode', "visualize", "Mode train/ test/ visualize")
+# tf.flags.DEFINE_string('mode', "visualize", "Mode train/ test/ visualize")
 # tf.flags.DEFINE_string('mode', "predonly", "Mode train/ test/ visualize")
 # tf.flags.DEFINE_string('mode', "fulltest", "Mode train/ test/ visualize")
 
