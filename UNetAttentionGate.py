@@ -153,22 +153,22 @@ def unetinference(image, is_training=False):
         conv5_1 = Utils.conv(pool4, filters=1024, l2_reg_scale=l2_reg, is_training=is_training)
         conv5_2 = Utils.conv(conv5_1, filters=1024, l2_reg_scale=l2_reg, is_training=is_training)
         concated1 = tf.concat([Utils.conv_transpose(
-            conv5_2, filters=512, l2_reg_scale=l2_reg, is_training=is_training), attention_gate(conv4_2, conv5_2, 1024)], axis=3)
+            conv5_2, filters=512, l2_reg_scale=l2_reg, is_training=is_training), attention_gate(conv4_2, conv5_2, 512)], axis=3)
 
         conv_up1_1 = Utils.conv(concated1, filters=512, l2_reg_scale=l2_reg, is_training=is_training)
         conv_up1_2 = Utils.conv(conv_up1_1, filters=512, l2_reg_scale=l2_reg, is_training=is_training)
         concated2 = tf.concat([Utils.conv_transpose(
-            conv_up1_2, filters=256, l2_reg_scale=l2_reg, is_training=is_training), attention_gate(conv3_2, conv_up1_2, 512)], axis=3)
+            conv_up1_2, filters=256, l2_reg_scale=l2_reg, is_training=is_training), attention_gate(conv3_2, conv_up1_2, 256)], axis=3)
 
         conv_up2_1 = Utils.conv(concated2, filters=256, l2_reg_scale=l2_reg, is_training=is_training)
         conv_up2_2 = Utils.conv(conv_up2_1, filters=256, l2_reg_scale=l2_reg, is_training=is_training)
         concated3 = tf.concat([Utils.conv_transpose(
-            conv_up2_2, filters=128, l2_reg_scale=l2_reg, is_training=is_training), attention_gate(conv2_2, conv_up2_2, 256)], axis=3)
+            conv_up2_2, filters=128, l2_reg_scale=l2_reg, is_training=is_training), attention_gate(conv2_2, conv_up2_2, 128)], axis=3)
 
         conv_up3_1 = Utils.conv(concated3, filters=128, l2_reg_scale=l2_reg, is_training=is_training)
         conv_up3_2 = Utils.conv(conv_up3_1, filters=128, l2_reg_scale=l2_reg, is_training=is_training)
         concated4 = tf.concat([Utils.conv_transpose(
-            conv_up3_2, filters=64, l2_reg_scale=l2_reg, is_training=is_training), attention_gate(conv1_2, conv_up3_2, 128)], axis=3)
+            conv_up3_2, filters=64, l2_reg_scale=l2_reg, is_training=is_training), attention_gate(conv1_2, conv_up3_2, 64)], axis=3)
 
         conv_up4_1 = Utils.conv(concated4, filters=64, l2_reg_scale=l2_reg, is_training=is_training)
         conv_up4_2 = Utils.conv(conv_up4_1, filters=64, l2_reg_scale=l2_reg, is_training=is_training)
@@ -188,12 +188,13 @@ def unetinference(image, is_training=False):
 def attention_gate(encoder_input, decoder_input, filters, is_training=False):
     l2_reg = FLAGS.learning_rate
     decoder_input = tf.image.resize_images(decoder_input, tf.shape(encoder_input)[1:3, ])
+    decoder_input = Utils.conv(decoder_input, filters=filters, l2_reg_scale=l2_reg, is_training=is_training)
 
     gated = tf.reduce_mean(tf.stack([encoder_input, decoder_input]), axis=0)
     gated = tf.nn.relu(gated)
     gated = Utils.conv(gated, filters=filters, l2_reg_scale=l2_reg, is_training=is_training)
     gated = tf.nn.sigmoid(gated)
-    gated = tf.multiply(gated, decoder_input)
+    gated = tf.multiply(gated, encoder_input)
 
     return gated
 
