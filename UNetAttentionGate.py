@@ -187,6 +187,7 @@ def unetinference(image, is_training=False):
 
 def attention_gate(encoder_input, decoder_input, filters, is_training=False):
     l2_reg = FLAGS.learning_rate
+    decoder_input = tf.image.resize_images(decoder_input, tf.shape(encoder_input)[1:3, ])
 
     gated = tf.reduce_mean(tf.stack([encoder_input, decoder_input]), axis=0)
     gated = tf.nn.relu(gated)
