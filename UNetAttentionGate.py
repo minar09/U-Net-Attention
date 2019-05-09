@@ -26,7 +26,7 @@ if DATA_SET == "10k":
         "training_epochs",
         "50",
         "number of epochs for training")
-    tf.flags.DEFINE_string("logs_dir", "logs/UNetAttention_10k/",
+    tf.flags.DEFINE_string("logs_dir", "logs/UNetAttentionGate_10k/",
                            "path to logs directory")
     tf.flags.DEFINE_string(
         "data_dir", "D:/Datasets/Dressup10k/", "path to dataset")
@@ -37,7 +37,7 @@ if DATA_SET == "CFPD":
         "training_epochs",
         "70",
         "number of epochs for training")
-    tf.flags.DEFINE_string("logs_dir", "logs/UNet_CFPD/",
+    tf.flags.DEFINE_string("logs_dir", "logs/UNetAttentionGate_CFPD/",
                            "path to logs directory")
     tf.flags.DEFINE_string(
         "data_dir", "D:/Datasets/CFPD/", "path to dataset")
@@ -48,7 +48,7 @@ if DATA_SET == "LIP":
         "training_epochs",
         "30",
         "number of epochs for training")
-    tf.flags.DEFINE_string("logs_dir", "logs/UNet_LIP/",
+    tf.flags.DEFINE_string("logs_dir", "logs/UNetAttentionGate_LIP/",
                            "path to logs directory")
     tf.flags.DEFINE_string(
         "data_dir", "D:/Datasets/LIP/", "path to dataset")
