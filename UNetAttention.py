@@ -284,8 +284,7 @@ def main(argv=None):
         attn_input.append(tf.image.resize_images(att050, tf.shape(att100)[1:3, ]))
         attn_input_train = tf.concat(attn_input, axis=3)
         attn_output_train = attention(attn_input_train, is_training)
-        # attn_output_train = attention(attn_input_train, is_training)
-        # scale_att_mask = tf.nn.softmax(attn_output_train)    # Add axis?
+        attn_output_train = tf.nn.softmax(attn_output_train, axis=3)    # Add axis?
         # scale_att_mask = tf.argmax(attn_output_train)    # Add axis?
         scale_att_mask = attn_output_train
 
