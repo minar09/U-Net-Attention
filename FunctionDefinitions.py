@@ -64,7 +64,7 @@ lip_label_colours = [(0, 0, 0),  # 0=Background
                      ]
 
 
-def mode_visualize(sess, flags, test_dir, validation_dataset_reader, pred_annotation, attn_output_test, pred_annotation100, pred_annotation075, pred_annotation125, image, annotation, keep_probability, num_classes):
+def mode_visualize(sess, flags, test_dir, validation_dataset_reader, attn_output_test, pred_annotation, pred_annotation100, pred_annotation075, pred_annotation125, image, annotation, keep_probability, num_classes):
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
