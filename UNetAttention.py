@@ -467,8 +467,8 @@ def main(argv=None):
     # test-random-validation-data mode
     elif FLAGS.mode == "visualize":
 
-        fd.mode_visualize(sess, FLAGS, VIS_DIR, validation_dataset_reader,
-                          attn_output_test, final_annotation_pred_test, pred_annotation100, pred_annotation075, pred_annotation125, image, annotation, keep_probability, NUM_OF_CLASSES)
+        fd.mode_visualize_scales(sess, FLAGS, VIS_DIR, validation_dataset_reader,
+                                 attn_output_test, final_annotation_pred_test, pred_annotation100, pred_annotation075, pred_annotation125, image, annotation, keep_probability, NUM_OF_CLASSES)
 
     # test-full-validation-dataset mode
     elif FLAGS.mode == "test":

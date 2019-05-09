@@ -596,7 +596,7 @@ def dropout(inputs, prob, is_training=False):
     return dropout_applied
 
 
-def conv_transpose(inputs, filters, l2_reg_scale=None):
+def conv_transpose(inputs, filters, l2_reg_scale=None, is_training=False):
     if l2_reg_scale is None:
         regularizer = None
     else:
@@ -610,4 +610,6 @@ def conv_transpose(inputs, filters, l2_reg_scale=None):
         activation=tf.nn.relu,
         kernel_regularizer=regularizer
     )
+    if is_training:
+        conved = bn(conved, is_training)
     return conved

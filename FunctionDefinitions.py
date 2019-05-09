@@ -64,7 +64,93 @@ lip_label_colours = [(0, 0, 0),  # 0=Background
                      ]
 
 
-def mode_visualize(sess, flags, test_dir, validation_dataset_reader, attn_output_test, pred_annotation, pred_annotation100, pred_annotation075, pred_annotation125, image, annotation, keep_probability, num_classes):
+def mode_visualize(sess, flags, test_dir, validation_dataset_reader, pred_annotation, logits, image, annotation, keep_probability, num_classes):
+    if not os.path.exists(test_dir):
+        os.makedirs(test_dir)
+
+    valid_images, valid_annotations = validation_dataset_reader.get_random_batch(
+        flags.batch_size)
+    probability = tf.nn.softmax(logits=logits, axis=3)
+    pred, predprob = sess.run([pred_annotation, probability],
+                                                      feed_dict={image: valid_images, annotation: valid_annotations,
+                               keep_probability: 1.0})
+
+    valid_annotations = np.squeeze(valid_annotations, axis=3)
+    pred = np.squeeze(pred, axis=3)
+    predprob = np.squeeze(predprob, axis=3)
+
+    crossMats = list()
+    crf_crossMats = list()
+
+    for itr in range(flags.batch_size):
+        print("Saved image: %d" % itr)
+
+        # Eval metrics for this image prediction
+        cm = EvalMetrics.calculate_confusion_matrix(
+            valid_annotations[itr].astype(
+                np.uint8), pred[itr].astype(
+                np.uint8), num_classes)
+        crossMats.append(cm)
+
+        fig = plt.figure()
+        pos = 240 + 1
+        plt.subplot(pos)
+        plt.imshow(valid_images[itr].astype(np.uint8))
+        plt.axis('off')
+        plt.title('Original')
+
+        pos = 240 + 2
+        plt.subplot(pos)
+        plt.imshow(
+            valid_annotations[itr].astype(
+                np.uint8),
+                       cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
+        plt.axis('off')
+        plt.title('GT')
+
+        pos = 240 + 3
+        plt.subplot(pos)
+        plt.imshow(
+            pred[itr].astype(
+                np.uint8),
+                       cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
+        plt.axis('off')
+        plt.title('Prediction')
+
+        # crf
+        crfwithprobsoutput = denseCRF.crf_with_probs(
+            valid_images[itr].astype(np.uint8), predprob[itr], num_classes)
+
+        crf_cm = EvalMetrics.calculate_confusion_matrix(
+            valid_annotations[itr].astype(
+                np.uint8), crfwithprobsoutput[itr].astype(
+                np.uint8), num_classes)
+        crf_crossMats.append(crf_cm)
+
+        pos = 240 + 4
+        plt.subplot(pos)
+        plt.imshow(
+            crfwithprobsoutput.astype(
+                np.uint8),
+            cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
+        plt.axis('off')
+        plt.title('Prediction100')
+
+        plt.savefig(test_dir + "resultSum_" +
+                    str(itr))
+
+        plt.close('all')
+
+    print(">>> Prediction results:")
+    total_cm = np.sum(crossMats, axis=0)
+    EvalMetrics.show_result(total_cm, num_classes)
+
+    print(">>> CRF Prediction results:")
+    crf_total_cm = np.sum(crf_crossMats, axis=0)
+    EvalMetrics.show_result(crf_total_cm, num_classes)
+
+
+def mode_visualize_scales(sess, flags, test_dir, validation_dataset_reader, attn_output_test, pred_annotation, pred_annotation100, pred_annotation075, pred_annotation125, image, annotation, keep_probability, num_classes):
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
