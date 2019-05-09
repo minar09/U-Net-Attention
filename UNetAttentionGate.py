@@ -172,12 +172,12 @@ def unetinference(image, is_training=False):
 
         conv_up4_1 = Utils.conv(concated4, filters=64, l2_reg_scale=l2_reg, is_training=is_training)
         conv_up4_2 = Utils.conv(conv_up4_1, filters=64, l2_reg_scale=l2_reg, is_training=is_training)
-        outputs = Utils.conv(
+        logits = Utils.conv(
             conv_up4_2, filters=NUM_OF_CLASSES, kernel_size=[
                 1, 1], activation=None, is_training=is_training)
-        annotation_pred = tf.argmax(outputs, dimension=3, name="prediction")
+        annotation_pred = tf.argmax(logits, dimension=3, name="prediction")
 
-        return tf.expand_dims(annotation_pred, dim=3), outputs, net
+        return tf.expand_dims(annotation_pred, dim=3), logits, net
 
 
 """
