@@ -186,7 +186,7 @@ def unetinference(image, keep_prob=0.5, is_training=False):
                 1, 1], activation=None)
         annotation_pred = tf.argmax(outputs, dimension=3, name="prediction")
 
-        return tf.expand_dims(annotation_pred, dim=3), outputs, net
+        return tf.expand_dims(annotation_pred, dim=3), outputs, net, conv5_1_weight
 
 
 """
@@ -266,13 +266,13 @@ def main(argv=None):
     reuse2 = True
 
     with tf.variable_scope('', reuse=reuse1):
-        pred_annotation100, logits100, net100 = unetinference(image, keep_probability, is_training=is_training)
+        pred_annotation100, logits100, net100, conv5_1_weight100 = unetinference(image, keep_probability, is_training=is_training)
     with tf.variable_scope('', reuse=reuse2):
-        pred_annotation075, logits075, net075 = unetinference(image075, keep_probability, is_training=is_training)
+        pred_annotation075, logits075, net075, conv5_1_weight075 = unetinference(image075, keep_probability, is_training=is_training)
     with tf.variable_scope('', reuse=reuse2):
-        pred_annotation050, logits050, net050 = unetinference(image050, keep_probability, is_training=is_training)
+        pred_annotation050, logits050, net050, conv5_1_weight050 = unetinference(image050, keep_probability, is_training=is_training)
     with tf.variable_scope('', reuse=reuse2):
-        pred_annotation125, logits125, net125 = unetinference(image125, keep_probability, is_training=is_training)
+        pred_annotation125, logits125, net125, conv5_1_weight125 = unetinference(image125, keep_probability, is_training=is_training)
 
     logits_train = tf.reduce_mean(tf.stack([logits100,
                                       tf.image.resize_images(logits075,
@@ -435,7 +435,7 @@ def main(argv=None):
     elif FLAGS.mode == "visualize":
 
         fd.mode_visualize(sess, FLAGS, VIS_DIR, validation_dataset_reader,
-                          logits_test, pred_annotation_test, pred_annotation100, pred_annotation075, pred_annotation125, image, annotation, keep_probability, NUM_OF_CLASSES)
+                          conv5_1_weight100, pred_annotation_test, pred_annotation100, pred_annotation075, pred_annotation125, image, annotation, keep_probability, NUM_OF_CLASSES)
 
     # test-full-validation-dataset mode
     elif FLAGS.mode == "test":
