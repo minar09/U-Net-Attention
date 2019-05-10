@@ -64,14 +64,14 @@ lip_label_colours = [(0, 0, 0),  # 0=Background
                      ]
 
 
-def mode_visualize(sess, flags, test_dir, validation_dataset_reader, pred_annotation, image, annotation, keep_probability, num_classes):
+def mode_visualize(sess, flags, test_dir, validation_dataset_reader, pred_annotation, image, annotation, training, num_classes):
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
     valid_images, valid_annotations = validation_dataset_reader.get_random_batch(
         flags.batch_size)
     pred = sess.run(pred_annotation, feed_dict={image: valid_images, annotation: valid_annotations,
-                    keep_probability: 1.0})
+                    training: False})
 
     valid_annotations = np.squeeze(valid_annotations, axis=3)
     pred = np.squeeze(pred, axis=3)
@@ -123,15 +123,15 @@ def mode_visualize(sess, flags, test_dir, validation_dataset_reader, pred_annota
     EvalMetrics.show_result(total_cm, num_classes)
 
 
-def mode_visualize_scales(sess, flags, test_dir, validation_dataset_reader, attn_output_test, pred_annotation, pred_annotation100, pred_annotation075, pred_annotation125, image, annotation, keep_probability, num_classes):
+def mode_visualize_scales(sess, flags, test_dir, validation_dataset_reader, attn_output_test, pred_annotation, pred_annotation100, pred_annotation075, pred_annotation125, image, annotation, training, num_classes):
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
     valid_images, valid_annotations = validation_dataset_reader.get_random_batch(
         flags.batch_size)
-    pred, weights, pred100, pred75, pred125 = sess.run([pred_annotation, attn_output_test, pred_annotation100, pred_annotation075, pred_annotation125],
+    weights, pred, pred100, pred75, pred125 = sess.run([attn_output_test, pred_annotation, pred_annotation100, pred_annotation075, pred_annotation125],
                                                       feed_dict={image: valid_images, annotation: valid_annotations,
-                               keep_probability: 1.0})
+                               training: False})
 
     valid_annotations = np.squeeze(valid_annotations, axis=3)
     pred = np.squeeze(pred, axis=3)
@@ -222,7 +222,7 @@ def mode_visualize_scales(sess, flags, test_dir, validation_dataset_reader, attn
     EvalMetrics.show_result(total_cm, num_classes)
 
 
-def mode_train(sess, FLAGS, net, train_dataset_reader, validation_dataset_reader, image, annotation, keep_probability, train_op, loss, summary_op, summary_writer, saver):
+def mode_train(sess, FLAGS, net, train_dataset_reader, validation_dataset_reader, pred_annotation, image, annotation, training, train_op, loss, summary_op, summary_writer, saver):
     print(">>>>>>>>>>>>>>>>Train mode")
     start = time.time()
 
@@ -232,7 +232,7 @@ def mode_train(sess, FLAGS, net, train_dataset_reader, validation_dataset_reader
     step = list()
     lo = list()
 
-    global_step = sess.run(net['global_step'])
+    # global_step = sess.run(net['global_step'])
     global_step = 0
     max_iteration = round(
         (train_dataset_reader.get_num_of_records() //
@@ -254,15 +254,17 @@ def mode_train(sess, FLAGS, net, train_dataset_reader, validation_dataset_reader
         feed_dict = {
             image: train_images,
             annotation: train_annotations,
-            keep_probability: 0.85}
+            training: True}
 
         # 6.2 training
         sess.run(train_op, feed_dict=feed_dict)
 
         if itr % 10 == 0:
-            train_loss, summary_str = sess.run(
-                [loss, summary_op], feed_dict=feed_dict)
-            print("Step: %d, Train_loss:%g" % (itr, train_loss))
+            pixel_acc_op, _ = tf.metrics.accuracy(labels=annotation, predictions=pred_annotation)
+            sess.run(tf.local_variables_initializer())
+            train_loss, summary_str, pixel_acc = sess.run(
+                [loss, summary_op, pixel_acc_op], feed_dict=feed_dict)
+            print("Step: %d, Train_loss: %g, Pixel acc: %g" % (itr, train_loss, pixel_acc))
             summary_writer.add_summary(summary_str, itr)
             if itr % display_step == 0 and itr != 0:
                 lo.append(train_loss)
@@ -270,15 +272,17 @@ def mode_train(sess, FLAGS, net, train_dataset_reader, validation_dataset_reader
         if itr % display_step == 0 and itr != 0:
             valid_images, valid_annotations = validation_dataset_reader.next_batch(
                 FLAGS.batch_size)
-            valid_loss = sess.run(
-                loss,
+            pixel_acc_op, _ = tf.metrics.accuracy(labels=annotation, predictions=pred_annotation)
+            sess.run(tf.local_variables_initializer())
+            valid_loss, pixel_acc = sess.run(
+                [loss, pixel_acc_op],
                 feed_dict={
                     image: valid_images,
                     annotation: valid_annotations,
-                    keep_probability: 1.0})
+                    training: True})
             print(
-                "%s ---> Validation_loss: %g" %
-                (datetime.datetime.now(), valid_loss))
+                "%s ---> Validation_loss: %g, --> Pixel acc: %g" %
+                (datetime.datetime.now(), valid_loss, pixel_acc))
             global_step = sess.run(net['global_step'])
             saver.save(
                 sess,
@@ -340,7 +344,7 @@ def mode_train(sess, FLAGS, net, train_dataset_reader, validation_dataset_reader
     print("Learning time:", end - start, "seconds")
 
 
-def mode_test(sess, flags, save_dir, validation_dataset_reader, pred_annotation, image, annotation, keep_probability, logits, num_classes):
+def mode_test(sess, flags, save_dir, validation_dataset_reader, pred_annotation, image, annotation, training, logits, num_classes):
     print(">>>>>>>>>>>>>>>>Test mode")
     start = time.time()
 
@@ -353,26 +357,12 @@ def mode_test(sess, flags, save_dir, validation_dataset_reader, pred_annotation,
     cross_mats = list()
     crf_cross_mats = list()
 
-    # tf_pixel_acc_list = []
-    # tf_miou_list = []
-
-    # pixel_acc_op, pixel_acc_update_op = tf.metrics.accuracy(labels=annotation, predictions=pred_annotation)
-    # mean_iou_op, mean_iou_update_op = tf.metrics.mean_iou(labels=annotation, predictions=pred_annotation, num_classes=num_classes)
-
     for itr1 in range(validation_dataset_reader.get_num_of_records() // flags.batch_size):
 
         valid_images, valid_annotations = validation_dataset_reader.next_batch(
             flags.batch_size)
 
-        predprob, pred = sess.run([probability, pred_annotation], feed_dict={image: valid_images, keep_probability: 1.0})
-
-        # tf measures
-        sess.run(tf.local_variables_initializer())
-        feed_dict = {image: valid_images, annotation: valid_annotations, keep_probability: 1.0}
-        # predprob, pred, _, __ = sess.run([probability, pred_annotation, pixel_acc_update_op, mean_iou_update_op], feed_dict=feed_dict)
-        # tf_pixel_acc, tf_miou = sess.run([pixel_acc_op, mean_iou_op], feed_dict=feed_dict)
-        # tf_pixel_acc_list.append(tf_pixel_acc)
-        # tf_miou_list.append(tf_miou)
+        predprob, pred = sess.run([probability, pred_annotation], feed_dict={image: valid_images, annotation: valid_annotations, training: False})
 
         np.set_printoptions(threshold=10)
 
@@ -487,10 +477,6 @@ def mode_test(sess, flags, save_dir, validation_dataset_reader, pred_annotation,
             total_cm,
             fmt='%4i',
             delimiter=',')
-
-        # print("\n>>> Prediction results (TF functions):")
-        # print("Pixel acc:", np.nanmean(tf_pixel_acc_list))
-        # print("mean IoU:", np.nanmean(tf_miou_list))
 
         print("\n>>> Prediction results:")
         EvalMetrics.calculate_eval_metrics_from_confusion_matrix(total_cm, num_classes)
