@@ -298,14 +298,13 @@ def main(argv=None):
 
         final_annotation_pred = tf.expand_dims(tf.argmax(score_final_train, dimension=3, name="final_prediction"), dim=3)
         final_annotation_pred_train = tf.reduce_mean(
-            tf.stack([tf.cast(score_final_train, tf.float32), tf.cast(pred_annotation100, tf.float32),
+            tf.stack([tf.cast(final_annotation_pred, tf.float32), tf.cast(pred_annotation100, tf.float32),
                       tf.image.resize_images(pred_annotation075,
                                              tf.shape(pred_annotation100)[1:3, ]),
                       tf.image.resize_images(pred_annotation050,
                                              tf.shape(pred_annotation100)[1:3, ])]),
             axis=0)
-        final_annotation_pred_train = tf.expand_dims(tf.argmax(final_annotation_pred_train, dimension=3, name="final_prediction"),
-                                               dim=3)
+        # final_annotation_pred_train = tf.expand_dims(tf.argmax(final_annotation_pred_train, dimension=3, name="final_prediction"), dim=3)
 
         # 3. loss measure
         loss = tf.reduce_mean(
@@ -376,13 +375,13 @@ def main(argv=None):
         score_final_test = score_att_x + score_att_x_075 + score_att_x_125
 
         final_annotation_pred = tf.expand_dims(tf.argmax(score_final_test, dimension=3, name="final_prediction"), dim=3)
-        final_annotation_pred_test = tf.reduce_mean(tf.stack([tf.cast(score_final_test, tf.float32), tf.cast(pred_annotation100, tf.float32),
+        final_annotation_pred_test = tf.reduce_mean(tf.stack([tf.cast(final_annotation_pred, tf.float32), tf.cast(pred_annotation100, tf.float32),
                                                         tf.image.resize_images(pred_annotation075,
                                                                                tf.shape(pred_annotation100)[1:3, ]),
                                                         tf.image.resize_images(pred_annotation125,
                                                                                tf.shape(pred_annotation100)[1:3, ])]),
                                               axis=0)
-        final_annotation_pred_test = tf.expand_dims(tf.argmax(final_annotation_pred_test, dimension=3, name="final_prediction"), dim=3)
+        # final_annotation_pred_test = tf.expand_dims(tf.argmax(final_annotation_pred_test, dimension=3, name="final_prediction"), dim=3)
 
     tf.summary.image("input_image", image, max_outputs=3)
     tf.summary.image(
@@ -470,7 +469,7 @@ def main(argv=None):
     elif FLAGS.mode == "visualize":
 
         fd.mode_visualize_scales(sess, FLAGS, VIS_DIR, validation_dataset_reader,
-                                 scale_att_mask, final_annotation_pred_test, pred_annotation100, pred_annotation075, pred_annotation125, image, annotation, training, NUM_OF_CLASSES)
+                                 scale_att_mask, final_annotation_pred, pred_annotation100, pred_annotation075, pred_annotation125, image, annotation, training, NUM_OF_CLASSES)
 
     # test-full-validation-dataset mode
     elif FLAGS.mode == "test":
