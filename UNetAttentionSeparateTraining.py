@@ -207,12 +207,14 @@ def attention(scale_input, is_training=False):
     if is_training is True:
         dropout_ratio = 0.5
 
-    conv1 = Utils.conv(scale_input, filters=512,
-                       l2_reg_scale=l2_reg, is_training=is_training)
-    conv1 = Utils.dropout(conv1, dropout_ratio, is_training)
-    conv2 = Utils.conv(conv1, filters=3, kernel_size=[
-                       1, 1], l2_reg_scale=l2_reg, is_training=is_training)
-    return conv2
+    with tf.variable_scope("attention"):
+        conv1 = Utils.conv(scale_input, filters=512,
+                           l2_reg_scale=l2_reg, is_training=is_training)
+        conv1 = Utils.dropout(conv1, dropout_ratio, is_training)
+        conv2 = Utils.conv(conv1, filters=3, kernel_size=[
+                           1, 1], l2_reg_scale=l2_reg, is_training=is_training)
+
+        return conv2
 
 
 """inference
@@ -403,7 +405,7 @@ def main(argv=None):
         attention_combined_loss = with_attention_loss + loss100 + loss075 + loss050
 
         # 4. optimizing
-        msc_trainable_var = tf.trainable_variables()
+        msc_trainable_var = tf.trainable_variables('inference')
         attention_trainable_var = tf.trainable_variables('attention')
         if FLAGS.debug:
             for var in msc_trainable_var:
