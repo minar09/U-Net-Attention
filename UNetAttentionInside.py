@@ -202,7 +202,8 @@ def attention(scale_input, is_training=False):
 
     conv1 = Utils.conv(scale_input, filters=512, l2_reg_scale=l2_reg)
     conv1 = Utils.dropout(conv1, dropout_ratio, is_training)
-    conv2 = Utils.conv(conv1, filters=3, kernel_size=[1, 1], l2_reg_scale=l2_reg)
+    conv2 = Utils.conv(conv1, filters=3, kernel_size=[
+                       1, 1], l2_reg_scale=l2_reg)
     return conv2
 
 
@@ -266,27 +267,31 @@ def main(argv=None):
     reuse2 = True
 
     with tf.variable_scope('', reuse=reuse1):
-        pred_annotation100, logits100, net100, conv5_1_weight100 = unetinference(image, keep_probability, is_training=is_training)
+        pred_annotation100, logits100, net100, conv5_1_weight100 = unetinference(
+            image, keep_probability, is_training=is_training)
     with tf.variable_scope('', reuse=reuse2):
-        pred_annotation075, logits075, net075, conv5_1_weight075 = unetinference(image075, keep_probability, is_training=is_training)
+        pred_annotation075, logits075, net075, conv5_1_weight075 = unetinference(
+            image075, keep_probability, is_training=is_training)
     with tf.variable_scope('', reuse=reuse2):
-        pred_annotation050, logits050, net050, conv5_1_weight050 = unetinference(image050, keep_probability, is_training=is_training)
+        pred_annotation050, logits050, net050, conv5_1_weight050 = unetinference(
+            image050, keep_probability, is_training=is_training)
     with tf.variable_scope('', reuse=reuse2):
-        pred_annotation125, logits125, net125, conv5_1_weight125 = unetinference(image125, keep_probability, is_training=is_training)
+        pred_annotation125, logits125, net125, conv5_1_weight125 = unetinference(
+            image125, keep_probability, is_training=is_training)
 
     logits_train = tf.reduce_mean(tf.stack([logits100,
-                                      tf.image.resize_images(logits075,
-                                                             tf.shape(logits100)[1:3, ]),
-                                      tf.image.resize_images(logits050,
-                                                             tf.shape(logits100)[1:3, ])]),
-                            axis=0)
+                                            tf.image.resize_images(logits075,
+                                                                   tf.shape(logits100)[1:3, ]),
+                                            tf.image.resize_images(logits050,
+                                                                   tf.shape(logits100)[1:3, ])]),
+                                  axis=0)
 
     pred_annotation_train = tf.reduce_mean(tf.stack([tf.cast(pred_annotation100, tf.float32),
-                                               tf.image.resize_images(pred_annotation075,
-                                                                      tf.shape(pred_annotation100)[1:3, ]),
-                                               tf.image.resize_images(pred_annotation050,
-                                                                      tf.shape(pred_annotation100)[1:3, ])]),
-                                     axis=0)
+                                                     tf.image.resize_images(pred_annotation075,
+                                                                            tf.shape(pred_annotation100)[1:3, ]),
+                                                     tf.image.resize_images(pred_annotation050,
+                                                                            tf.shape(pred_annotation100)[1:3, ])]),
+                                           axis=0)
 
     pred_annotation_test = tf.reduce_mean(tf.stack([tf.cast(pred_annotation100, tf.float32),
                                                     tf.image.resize_images(pred_annotation075,

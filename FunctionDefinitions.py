@@ -18,15 +18,15 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 
 label_colors_10k = ['black',  # "background", #     0
-                'sienna',  # "hat", #            1
-                'gray',  # "hair", #           2
-                'navy',  # "sunglass", #       3
-                'red',  # "upper-clothes", #  4
-                'gold',  # "skirt",  #          5
-                'blue',  # "pants",  #          6
-                'seagreen',  # "dress", #          7
-                'darkorchid',  # "belt", #           8
-                'firebrick',  # "left-shoe", #      9
+                    'sienna',  # "hat", #            1
+                    'gray',  # "hair", #           2
+                    'navy',  # "sunglass", #       3
+                    'red',  # "upper-clothes", #  4
+                    'gold',  # "skirt",  #          5
+                    'blue',  # "pants",  #          6
+                    'seagreen',  # "dress", #          7
+                    'darkorchid',  # "belt", #           8
+                    'firebrick',  # "left-shoe", #      9
                     'darksalmon',  # "right-shoe", #     10
                     'moccasin',  # "face",  #           11
                     'darkgreen',  # "left-leg", #       12
@@ -71,7 +71,7 @@ def mode_visualize(sess, flags, test_dir, validation_dataset_reader, pred_annota
     valid_images, valid_annotations = validation_dataset_reader.get_random_batch(
         flags.batch_size)
     pred = sess.run(pred_annotation, feed_dict={image: valid_images, annotation: valid_annotations,
-                    training: False})
+                                                training: False})
 
     valid_annotations = np.squeeze(valid_annotations, axis=3)
     pred = np.squeeze(pred, axis=3)
@@ -100,7 +100,7 @@ def mode_visualize(sess, flags, test_dir, validation_dataset_reader, pred_annota
         plt.imshow(
             valid_annotations[itr].astype(
                 np.uint8),
-                       cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
+            cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
         plt.axis('off')
         plt.title('GT')
 
@@ -109,7 +109,7 @@ def mode_visualize(sess, flags, test_dir, validation_dataset_reader, pred_annota
         plt.imshow(
             pred[itr].astype(
                 np.uint8),
-                       cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
+            cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
         plt.axis('off')
         plt.title('Prediction')
 
@@ -130,8 +130,8 @@ def mode_visualize_scales(sess, flags, test_dir, validation_dataset_reader, attn
     valid_images, valid_annotations = validation_dataset_reader.get_random_batch(
         flags.batch_size)
     weights, pred, pred100, pred75, pred125 = sess.run([attn_output_test, pred_annotation, pred_annotation100, pred_annotation075, pred_annotation125],
-                                                      feed_dict={image: valid_images, annotation: valid_annotations,
-                               training: False})
+                                                       feed_dict={image: valid_images, annotation: valid_annotations,
+                                                                  training: False})
 
     valid_annotations = np.squeeze(valid_annotations, axis=3)
     pred = np.squeeze(pred, axis=3)
@@ -163,7 +163,7 @@ def mode_visualize_scales(sess, flags, test_dir, validation_dataset_reader, attn
         plt.imshow(
             valid_annotations[itr].astype(
                 np.uint8),
-                       cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
+            cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
         plt.axis('off')
         plt.title('GT')
 
@@ -172,7 +172,7 @@ def mode_visualize_scales(sess, flags, test_dir, validation_dataset_reader, attn
         plt.imshow(
             weights[itr].astype(
                 np.uint8),
-                       cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
+            cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
         plt.axis('off')
         plt.title('Weights')
 
@@ -181,7 +181,7 @@ def mode_visualize_scales(sess, flags, test_dir, validation_dataset_reader, attn
         plt.imshow(
             pred[itr].astype(
                 np.uint8),
-                       cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
+            cmap=ListedColormap(label_colors_10k), norm=clothnorm_10k)
         plt.axis('off')
         plt.title('Prediction')
 
@@ -260,12 +260,14 @@ def mode_train(sess, FLAGS, net, train_dataset_reader, validation_dataset_reader
         sess.run(train_op, feed_dict=feed_dict)
 
         if itr % 10 == 0:
-            pixel_acc_op, pixel_acc_update_op = tf.metrics.accuracy(labels=annotation, predictions=pred_annotation)
+            pixel_acc_op, pixel_acc_update_op = tf.metrics.accuracy(
+                labels=annotation, predictions=pred_annotation)
             sess.run(tf.local_variables_initializer())
             sess.run(pixel_acc_update_op, feed_dict=feed_dict)
             train_loss, summary_str, pixel_acc = sess.run(
                 [loss, summary_op, pixel_acc_op], feed_dict=feed_dict)
-            print("Step: %d, Train_loss: %g, Pixel acc: %g" % (itr, train_loss, pixel_acc))
+            print("Step: %d, Train_loss: %g, Pixel acc: %g" %
+                  (itr, train_loss, pixel_acc))
             summary_writer.add_summary(summary_str, itr)
             if itr % display_step == 0 and itr != 0:
                 lo.append(train_loss)
@@ -276,9 +278,10 @@ def mode_train(sess, FLAGS, net, train_dataset_reader, validation_dataset_reader
             feed_dict = {
                 image: valid_images,
                 annotation: valid_annotations,
-                training: True}
+                training: False}
 
-            pixel_acc_op, pixel_acc_update_op = tf.metrics.accuracy(labels=annotation, predictions=pred_annotation)
+            pixel_acc_op, pixel_acc_update_op = tf.metrics.accuracy(
+                labels=annotation, predictions=pred_annotation)
             sess.run(tf.local_variables_initializer())
             sess.run(pixel_acc_update_op, feed_dict=feed_dict)
             valid_loss, pixel_acc = sess.run(
@@ -366,7 +369,8 @@ def mode_test(sess, flags, save_dir, validation_dataset_reader, pred_annotation,
         valid_images, valid_annotations = validation_dataset_reader.next_batch(
             flags.batch_size)
 
-        predprob, pred = sess.run([probability, pred_annotation], feed_dict={image: valid_images, annotation: valid_annotations, training: False})
+        predprob, pred = sess.run([probability, pred_annotation], feed_dict={
+                                  image: valid_images, annotation: valid_annotations, training: False})
 
         np.set_printoptions(threshold=10)
 
@@ -483,7 +487,8 @@ def mode_test(sess, flags, save_dir, validation_dataset_reader, pred_annotation,
             delimiter=',')
 
         print("\n>>> Prediction results:")
-        EvalMetrics.calculate_eval_metrics_from_confusion_matrix(total_cm, num_classes)
+        EvalMetrics.calculate_eval_metrics_from_confusion_matrix(
+            total_cm, num_classes)
 
         # Prediction with CRF
         crf_total_cm = np.sum(crf_cross_mats, axis=0)
@@ -496,7 +501,8 @@ def mode_test(sess, flags, save_dir, validation_dataset_reader, pred_annotation,
 
         print("\n")
         print("\n>>> Prediction results (CRF):")
-        EvalMetrics.calculate_eval_metrics_from_confusion_matrix(crf_total_cm, num_classes)
+        EvalMetrics.calculate_eval_metrics_from_confusion_matrix(
+            crf_total_cm, num_classes)
 
     except Exception as err:
         print(err)

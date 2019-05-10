@@ -56,8 +56,8 @@ def calc_precision_recall(contours_a, contours_b, threshold):
                 dist = (contours_a[a][0] - contours_b[b][0]) * \
                        (contours_a[a][0] - contours_b[b][0])
                 dist = dist + \
-                       (contours_a[a][1] - contours_b[b][1]) * \
-                       (contours_a[a][1] - contours_b[b][1])
+                    (contours_a[a][1] - contours_b[b][1]) * \
+                    (contours_a[a][1] - contours_b[b][1])
                 if dist < threshold * threshold:
                     top_count = top_count + 1
                     break

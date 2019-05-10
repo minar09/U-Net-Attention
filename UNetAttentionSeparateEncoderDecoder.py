@@ -208,7 +208,8 @@ def attention(scale_input, is_training=False):
 
     conv1 = Utils.conv(scale_input, filters=512, l2_reg_scale=l2_reg)
     conv1 = Utils.dropout(conv1, dropout_ratio, is_training)
-    conv2 = Utils.conv(conv1, filters=3, kernel_size=[1, 1], l2_reg_scale=l2_reg)
+    conv2 = Utils.conv(conv1, filters=3, kernel_size=[
+                       1, 1], l2_reg_scale=l2_reg)
     return conv2
 
 
@@ -278,41 +279,53 @@ def main(argv=None):
 
     # apply encoders
     with tf.variable_scope('', reuse=reuse1):
-        conv5_2_100, conv4_2_100, conv3_2_100, conv2_2_100, conv1_2_100, net100, att100 = unet_encoder(image, is_training=is_training)
+        conv5_2_100, conv4_2_100, conv3_2_100, conv2_2_100, conv1_2_100, net100, att100 = unet_encoder(
+            image, is_training=is_training)
     with tf.variable_scope('', reuse=reuse2):
-        conv5_2_075, conv4_2_075, conv3_2_075, conv2_2_075, conv1_2_075, net075, att075 = unet_encoder(image075, is_training=is_training)
+        conv5_2_075, conv4_2_075, conv3_2_075, conv2_2_075, conv1_2_075, net075, att075 = unet_encoder(
+            image075, is_training=is_training)
     with tf.variable_scope('', reuse=reuse2):
-        conv5_2_050, conv4_2_050, conv3_2_050, conv2_2_050, conv1_2_050, net050, att050 = unet_encoder(image050, is_training=is_training)
+        conv5_2_050, conv4_2_050, conv3_2_050, conv2_2_050, conv1_2_050, net050, att050 = unet_encoder(
+            image050, is_training=is_training)
     with tf.variable_scope('', reuse=reuse2):
-        conv5_2_125, conv4_2_125, conv3_2_125, conv2_2_125, conv1_2_125, net125, att125 = unet_encoder(image125, is_training=is_training)
+        conv5_2_125, conv4_2_125, conv3_2_125, conv2_2_125, conv1_2_125, net125, att125 = unet_encoder(
+            image125, is_training=is_training)
 
     # apply attention
     if FLAGS.mode == "train":
         attn_input = []
         attn_input.append(att100)
-        attn_input.append(tf.image.resize_images(att075, tf.shape(att100)[1:3, ]))
-        attn_input.append(tf.image.resize_images(att050, tf.shape(att100)[1:3, ]))
+        attn_input.append(tf.image.resize_images(
+            att075, tf.shape(att100)[1:3, ]))
+        attn_input.append(tf.image.resize_images(
+            att050, tf.shape(att100)[1:3, ]))
         attn_input_train = tf.concat(attn_input, axis=3)
         attn_output_train = attention(attn_input_train, is_training)
         attn_output_train = tf.nn.softmax(attn_output_train)    # Add axis?
         scale_att_mask = attn_output_train
 
-        score_att_x_100 = tf.multiply(conv5_2_100, tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3))
-        score_att_x_075 = tf.multiply(conv5_2_075, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 1], axis=3), tf.shape(conv5_2_075)[1:3, ]))
-        score_att_x_050 = tf.multiply(conv5_2_050, tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 2], axis=3), tf.shape(conv5_2_050)[1:3, ]))
+        score_att_x_100 = tf.multiply(
+            conv5_2_100, tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3))
+        score_att_x_075 = tf.multiply(conv5_2_075, tf.image.resize_images(
+            tf.expand_dims(scale_att_mask[:, :, :, 1], axis=3), tf.shape(conv5_2_075)[1:3, ]))
+        score_att_x_050 = tf.multiply(conv5_2_050, tf.image.resize_images(
+            tf.expand_dims(scale_att_mask[:, :, :, 2], axis=3), tf.shape(conv5_2_050)[1:3, ]))
 
     else:
         # apply attention model - test
         attn_input = []
         attn_input.append(att100)
-        attn_input.append(tf.image.resize_images(att075, tf.shape(att100)[1:3, ]))
-        attn_input.append(tf.image.resize_images(att125, tf.shape(att100)[1:3, ]))
+        attn_input.append(tf.image.resize_images(
+            att075, tf.shape(att100)[1:3, ]))
+        attn_input.append(tf.image.resize_images(
+            att125, tf.shape(att100)[1:3, ]))
         attn_input_test = tf.concat(attn_input, axis=3)
         attn_output_test = attention(attn_input_test, is_training)
         attn_output_test = tf.nn.softmax(attn_output_test)    # Add axis?
         scale_att_mask = attn_output_test
 
-        score_att_x_100 = tf.multiply(conv5_2_100, tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3))
+        score_att_x_100 = tf.multiply(
+            conv5_2_100, tf.expand_dims(scale_att_mask[:, :, :, 0], axis=3))
         score_att_x_075 = tf.multiply(conv5_2_075,
                                       tf.image.resize_images(tf.expand_dims(scale_att_mask[:, :, :, 1], axis=3),
                                                              tf.shape(conv5_2_075)[1:3, ]))
