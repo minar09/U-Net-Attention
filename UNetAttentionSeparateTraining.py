@@ -539,6 +539,7 @@ def main(argv=None):
     # test-random-validation-data mode
     elif FLAGS.mode == "visualize":
         # visualize multi-scales
+        # fd.mode_visualize(sess, FLAGS, VIS_DIR, validation_dataset_reader, pred_annotation_test_msc, image, annotation, training, NUM_OF_CLASSES)
         # fd.mode_visualize_scales(sess, FLAGS, VIS_DIR, validation_dataset_reader,
                                  # logits_test_msc, pred_annotation_test_msc, pred_annotation100,
                                  # pred_annotation075, pred_annotation125, image, annotation, training, NUM_OF_CLASSES)
