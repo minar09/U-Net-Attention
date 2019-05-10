@@ -527,10 +527,7 @@ def main(argv=None):
                       saver)
 
         # Additional attention model training
-        tf.flags.DEFINE_integer(
-            "training_epochs",
-            "20",
-            "number of epochs for training")
+        FLAGS.training_epochs = 20
         fd.mode_train(sess, FLAGS, net100, train_dataset_reader, validation_dataset_reader,
                       pred_annotation_test_attention,
                       image, annotation, training, attention_train_op, attention_combined_loss, summary_op, summary_writer,
