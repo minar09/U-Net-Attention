@@ -220,9 +220,8 @@ def train(loss_val, var_list, global_step):
     return optimizer.apply_gradients(grads, global_step=global_step)
 
 
-def main():
+def main(argv=None):
     # 1. input placeholders
-    keep_probability = tf.placeholder(tf.float32, name="keep_probability")
     image = tf.placeholder(
         tf.float32,
         shape=(
