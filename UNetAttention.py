@@ -37,7 +37,7 @@ if DATA_SET == "CFPD":
         "training_epochs",
         "70",
         "number of epochs for training")
-    tf.flags.DEFINE_string("logs_dir", "logs/UNet_CFPD/",
+    tf.flags.DEFINE_string("logs_dir", "logs/UNetAttention_CFPD/",
                            "path to logs directory")
     tf.flags.DEFINE_string(
         "data_dir", "D:/Datasets/CFPD/", "path to dataset")
@@ -48,7 +48,7 @@ if DATA_SET == "LIP":
         "training_epochs",
         "30",
         "number of epochs for training")
-    tf.flags.DEFINE_string("logs_dir", "logs/UNet_LIP/",
+    tf.flags.DEFINE_string("logs_dir", "logs/UNetAttention_LIP/",
                            "path to logs directory")
     tf.flags.DEFINE_string(
         "data_dir", "D:/Datasets/LIP/", "path to dataset")
@@ -57,14 +57,11 @@ tf.flags.DEFINE_float(
     "learning_rate",
     "1e-4",
     "Learning rate for Adam Optimizer")
-tf.flags.DEFINE_string("model_dir", "Model_zoo/", "Path to vgg model mat")
 tf.flags.DEFINE_bool('debug', "False", "Debug mode: True/ False")
 
 tf.flags.DEFINE_string('mode', "train", "Mode train/ test/ visualize")
 # tf.flags.DEFINE_string('mode', "test", "Mode train/ test/ visualize")
 # tf.flags.DEFINE_string('mode', "visualize", "Mode train/ test/ visualize")
-# tf.flags.DEFINE_string('mode', "predonly", "Mode train/ test/ visualize")
-# tf.flags.DEFINE_string('mode', "fulltest", "Mode train/ test/ visualize")
 
 MAX_ITERATION = int(1e5 + 1001)
 
