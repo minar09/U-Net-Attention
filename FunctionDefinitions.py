@@ -260,8 +260,9 @@ def mode_train(sess, FLAGS, net, train_dataset_reader, validation_dataset_reader
         sess.run(train_op, feed_dict=feed_dict)
 
         if itr % 10 == 0:
-            pixel_acc_op, _ = tf.metrics.accuracy(labels=annotation, predictions=pred_annotation)
+            pixel_acc_op, pixel_acc_update_op = tf.metrics.accuracy(labels=annotation, predictions=pred_annotation)
             sess.run(tf.local_variables_initializer())
+            sess.run(pixel_acc_update_op, feed_dict=feed_dict)
             train_loss, summary_str, pixel_acc = sess.run(
                 [loss, summary_op, pixel_acc_op], feed_dict=feed_dict)
             print("Step: %d, Train_loss: %g, Pixel acc: %g" % (itr, train_loss, pixel_acc))
@@ -272,14 +273,17 @@ def mode_train(sess, FLAGS, net, train_dataset_reader, validation_dataset_reader
         if itr % display_step == 0 and itr != 0:
             valid_images, valid_annotations = validation_dataset_reader.next_batch(
                 FLAGS.batch_size)
-            pixel_acc_op, _ = tf.metrics.accuracy(labels=annotation, predictions=pred_annotation)
+            feed_dict = {
+                image: valid_images,
+                annotation: valid_annotations,
+                training: True}
+
+            pixel_acc_op, pixel_acc_update_op = tf.metrics.accuracy(labels=annotation, predictions=pred_annotation)
             sess.run(tf.local_variables_initializer())
+            sess.run(pixel_acc_update_op, feed_dict=feed_dict)
             valid_loss, pixel_acc = sess.run(
                 [loss, pixel_acc_op],
-                feed_dict={
-                    image: valid_images,
-                    annotation: valid_annotations,
-                    training: True})
+                feed_dict=feed_dict)
             print(
                 "%s ---> Validation_loss: %g, --> Pixel acc: %g" %
                 (datetime.datetime.now(), valid_loss, pixel_acc))
