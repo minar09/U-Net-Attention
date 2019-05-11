@@ -260,14 +260,16 @@ def mode_train(sess, FLAGS, net, train_dataset_reader, validation_dataset_reader
         sess.run(train_op, feed_dict=feed_dict)
 
         if itr % 10 == 0:
-            pixel_acc_op, pixel_acc_update_op = tf.metrics.accuracy(
-                labels=annotation, predictions=pred_annotation)
-            sess.run(tf.local_variables_initializer())
-            sess.run(pixel_acc_update_op, feed_dict=feed_dict)
-            train_loss, summary_str, pixel_acc = sess.run(
-                [loss, summary_op, pixel_acc_op], feed_dict=feed_dict)
-            print("Step: %d, Train_loss: %g, Pixel acc: %g" %
-                  (itr, train_loss, pixel_acc))
+            # pixel_acc_op, pixel_acc_update_op = tf.metrics.accuracy(
+                # labels=annotation, predictions=pred_annotation)
+            # sess.run(tf.local_variables_initializer())
+            # sess.run(pixel_acc_update_op, feed_dict=feed_dict)
+            # train_loss, summary_str, pixel_acc = sess.run(
+                # [loss, summary_op, pixel_acc_op], feed_dict=feed_dict)
+            train_loss, summary_str = sess.run(
+                [loss, summary_op], feed_dict=feed_dict)
+            print("Step: %d, Train_loss: %g" %
+                  (itr, train_loss))
             summary_writer.add_summary(summary_str, itr)
             if itr % display_step == 0 and itr != 0:
                 lo.append(train_loss)
@@ -280,16 +282,14 @@ def mode_train(sess, FLAGS, net, train_dataset_reader, validation_dataset_reader
                 annotation: valid_annotations,
                 training: False}
 
-            pixel_acc_op, pixel_acc_update_op = tf.metrics.accuracy(
-                labels=annotation, predictions=pred_annotation)
-            sess.run(tf.local_variables_initializer())
-            sess.run(pixel_acc_update_op, feed_dict=feed_dict)
-            valid_loss, pixel_acc = sess.run(
-                [loss, pixel_acc_op],
-                feed_dict=feed_dict)
+            # pixel_acc_op, pixel_acc_update_op = tf.metrics.accuracy(labels=annotation, predictions=pred_annotation)
+            # sess.run(tf.local_variables_initializer())
+            # sess.run(pixel_acc_update_op, feed_dict=feed_dict)
+            # valid_loss, pixel_acc = sess.run([loss, pixel_acc_op],
+            valid_loss = sess.run(loss, feed_dict=feed_dict)
             print(
-                "%s ---> Validation_loss: %g, --> Pixel acc: %g" %
-                (datetime.datetime.now(), valid_loss, pixel_acc))
+                "%s ---> Validation_loss: %g" %
+                (datetime.datetime.now(), valid_loss))
             global_step = sess.run(net['global_step'])
             saver.save(
                 sess,
